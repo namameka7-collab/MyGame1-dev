@@ -1,0 +1,4256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Dark Tower</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #14171a;
+    --gold: #e8d8b0;
+    --gold-dim: #b9ab84;
+    --text: #e9e7e2;
+    --text-dim: #cfcdc8;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    width: 100%; height: 100%; height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  /* ===== ФОН ИГРЫ: тёмный лес, затемнённый для читаемости текста ===== */
+  #bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background: url('assets/bg-forest.jpg') center center / cover no-repeat;
+  }
+  #bg-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(8,9,11,0.35), rgba(6,7,9,0.72) 72%),
+      linear-gradient(180deg, rgba(6,7,9,0.55), rgba(6,7,9,0.62) 40%, rgba(6,7,9,0.72));
+  }
+
+  #app {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ===== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ===== */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(24px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  .screen.active {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+  .screen.leaving {
+    transform: translateX(-24px);
+  }
+
+
+  h2.page-title {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--gold-dim);
+    margin: 18px 0 0;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+  }
+
+  #battle-demo-screen { padding: 0; }
+
+  /* ===== ОБЩИЕ ЗОНЫ: ТЕКСТ + ПЕРСОНАЖ ===== */
+  .top-zone {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+  }
+  .text-zone {
+    position: absolute;
+    left: 0; top: 0;
+    width: 54%;
+    height: 100%;
+    z-index: 2;
+    padding: 22px 8px 20px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    background: linear-gradient(100deg, rgba(8,9,10,0.55) 0%, rgba(8,9,10,0.32) 68%, rgba(8,9,10,0) 100%);
+  }
+  .text-zone .char-name {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin: 0 0 4px;
+    line-height: 1.3;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .text-zone .char-class {
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--gold-dim);
+    margin: 0 0 14px;
+  }
+  .text-zone .char-desc,
+  .text-zone p {
+    font-size: 15.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin: 0 0 12px;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .text-zone .skills {
+    list-style: none;
+    margin: 0; padding: 0;
+    border-top: 1px solid rgba(232,216,176,0.3);
+    padding-top: 10px;
+  }
+  .text-zone .skills li {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    margin-bottom: 6px;
+    padding-left: 14px;
+    position: relative;
+  }
+  .text-zone .skills li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 8px;
+    width: 5px; height: 5px;
+    background: var(--gold);
+    transform: rotate(45deg);
+  }
+  .text-zone .skills li b { color: var(--gold); font-weight: 600; }
+
+  .char-zone {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 56%;
+    height: 84%;
+    z-index: 1;
+  }
+  #welcome-screen .char-zone { height: 78%; }
+  .char-zone picture,
+  .char-zone img {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .char-zone img {
+    object-fit: contain;
+    object-position: bottom right;
+    filter: drop-shadow(0 14px 18px rgba(0,0,0,0.35));
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  /* анимация смены персонажа внутри карусели */
+  .slide-out-left   { animation: outLeft 0.28s ease forwards; }
+  .slide-out-right  { animation: outRight 0.28s ease forwards; }
+  .slide-in-left    { animation: inLeft 0.32s ease forwards; }
+  .slide-in-right   { animation: inRight 0.32s ease forwards; }
+  @keyframes outLeft  { to { transform: translateX(-30px); opacity: 0; } }
+  @keyframes outRight { to { transform: translateX(30px);  opacity: 0; } }
+  @keyframes inLeft   { from { transform: translateX(30px);  opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes inRight  { from { transform: translateX(-30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  #dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding-bottom: 4px;
+  }
+  #dots span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(232,216,176,0.3);
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  #dots span.active {
+    background: var(--gold);
+    transform: scale(1.3);
+  }
+
+  /* ===== НИЖНЯЯ ЗОНА ===== */
+  .bottom-zone {
+    flex: 0 0 auto;
+    padding: 18px 22px calc(22px + env(safe-area-inset-bottom));
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  button.btn-outline {
+    font-family: 'Cinzel', serif;
+    font-size: 14.5px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: transparent;
+    border: 1.5px solid var(--gold);
+    border-radius: 4px;
+    padding: 15px 10px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  button.btn-outline:active {
+    background: var(--gold);
+    color: #33322c;
+  }
+
+  #welcome-screen button.btn-outline { width: 100%; max-width: 420px; }
+  #gender-screen button.btn-outline { width: 100%; max-width: 420px; }
+  #select-screen button.btn-outline { flex: 1; }
+
+  button.nav-arrow {
+    flex: 0 0 54px;
+    background: transparent;
+    border: 1.5px solid var(--gold-dim);
+    border-radius: 4px;
+    color: var(--gold);
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  button.nav-arrow:active { background: rgba(232,216,176,0.15); }
+
+  /* ===== ЭКРАН ОБУЧЕНИЯ: ДИАЛОГ СТРЕЛКА ===== */
+  #tutorial-screen { padding: 0; }
+
+  /* Стрелок в полный рост — слева, как основной портрет экрана */
+  #tutor-char-zone {
+    left: 0;
+    right: auto;
+    width: 50%;
+    height: 90%;
+  }
+  #tutor-char-zone img {
+    object-position: bottom left;
+  }
+
+  /* Плавающий виджет-демонстрация конкретной механики — справа сверху */
+  .tutor-demo-zone {
+    position: absolute;
+    top: 6%;
+    right: 5%;
+    z-index: 2;
+    width: 44%;
+    max-width: 250px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: none;
+  }
+  .tutor-demo-zone.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .demo-card {
+    background: rgba(20,19,18,0.72);
+    border: 1px solid rgba(232,216,176,0.35);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  }
+  .demo-card .unit-name { margin-top: 0; }
+  .demo-turnorder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .demo-turn-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+  }
+  .demo-turn-step.active { color: var(--gold); }
+  .demo-turn-icon { font-size: 24px; }
+  .demo-turn-icon img {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+  }
+  .demo-turn-arrow { font-size: 18px; color: var(--gold-dim); }
+  .demo-skills-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+  .demo-caption {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--text-dim);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  #tutor-progress { padding: 0 22px; margin-top: 4px; }
+  .tutor-box {
+    margin: 0 22px 14px;
+    background: rgba(30,28,26,0.55);
+    border: 1px solid rgba(232,216,176,0.35);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  #tutorial-screen .bottom-zone { padding-top: 0; }
+  .tutor-name {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .tutor-text {
+    font-size: 16.5px;
+    line-height: 1.55;
+    color: var(--text);
+    min-height: 4.7em;
+  }
+  #tutorial-screen .btn-outline { width: 100%; max-width: 440px; }
+  #tutor-progress {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  #tutor-progress span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: rgba(232,216,176,0.3);
+  }
+  #tutor-progress span.active { background: var(--gold); }
+
+
+  .battle-bars {
+    padding: 10px 16px 4px;
+  }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+  }
+  .bar-label {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    width: 34px;
+    flex: 0 0 auto;
+  }
+  .bar-track {
+    position: relative;
+    flex: 1;
+    height: 9px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.28);
+    border: 1px solid rgba(232,216,176,0.25);
+    overflow: hidden;
+  }
+  .bar-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 4px; transition: width 0.35s ease; }
+  .bar-fill.hp   { background: linear-gradient(90deg, #7a2020, #c0392b); z-index: 2; }
+  .bar-fill.armor{ background: linear-gradient(90deg, #38607a, #5a9bb8); z-index: 2; }
+  /* броня в запасе (отключена ударом когтей волка) — тусклая полупрозрачная полоска под активной бронёй */
+  .bar-fill.armor-reserve {
+    background: repeating-linear-gradient(135deg, rgba(120,150,168,0.38) 0px, rgba(120,150,168,0.38) 5px, rgba(120,150,168,0.2) 5px, rgba(120,150,168,0.2) 10px);
+    border: 1px dashed rgba(170,200,214,0.5);
+    box-sizing: border-box;
+    z-index: 1;
+  }
+  .bar-value {
+    font-size: 11px;
+    color: var(--text-dim);
+    width: 52px;
+    flex: 0 0 auto;
+    text-align: right;
+  }
+  .unit-name {
+    font-family: 'Cinzel', serif;
+    font-size: 12.5px;
+    letter-spacing: 1px;
+    color: var(--gold-dim);
+    text-align: center;
+    margin: 2px 0 4px;
+  }
+
+  .combat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+  }
+  .combat-row.enemy-row { justify-content: flex-end; }
+  .combat-row.player-row { justify-content: center; }
+
+  #player-section { margin-top: auto; padding-bottom: 10px; }
+
+  .player-skills-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 8px 16px 4px;
+  }
+
+  .avatar-circle {
+    width: 92px; height: 92px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    flex: 0 0 auto;
+    overflow: hidden;
+    position: relative;
+  }
+  .avatar-circle.player { background: radial-gradient(circle at 40% 30%, #4a1f22, #221011); border: 1.5px solid #c0392b; }
+  .avatar-circle.enemy  { background: radial-gradient(circle at 40% 30%, #2a2438, #14111c); border: 1.5px solid #8a6fd0; }
+  .avatar-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* ===== АНИМАЦИИ БОЯ: аватары и эффекты ===== */
+  .avatar-fx-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  /* колонка: аватар сверху, значки дебаффов снизу */
+  .avatar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    flex: 0 0 auto;
+  }
+  .status-row {
+    display: flex;
+    gap: 4px;
+    min-height: 22px;
+    align-items: center;
+    justify-content: center;
+  }
+  .status-badge {
+    position: relative;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(10,9,8,0.75);
+    border: 1px solid var(--gold-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .status-badge svg { width: 13px; height: 13px; display: block; pointer-events: none; }
+  .status-badge.bleed { border-color: #c0392b; }
+  .status-badge.shieldBreak { border-color: #8a6fd0; }
+  .status-badge.stun { border-color: #e0b95a; }
+  .status-badge.vamp { border-color: #b0102c; }
+  .status-badge.poison { border-color: #5fbf5f; }
+  .status-badge.berserk { border-color: #e05b3a; }
+  .status-badge.transform { border-color: #a99bd6; }
+  .status-badge .status-count {
+    position: absolute;
+    bottom: -5px; right: -5px;
+    background: #1c1a17;
+    border: 1px solid var(--gold-dim);
+    border-radius: 50%;
+    width: 14px; height: 14px;
+    font-size: 8.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold);
+    pointer-events: none;
+  }
+  /* полупрозрачная кровь, проступающая на аватаре при уроне */
+  .blood-splat {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 4;
+  }
+  .blood-splat::after {
+    content: '';
+    position: absolute;
+    inset: -25%;
+    background: url('assets/effect-blood.png') center / cover no-repeat;
+    opacity: 0;
+    mix-blend-mode: multiply;
+  }
+  .blood-splat.show::after { animation: bloodFade 1.3s ease forwards; }
+  @keyframes bloodFade {
+    0%   { opacity: 0;    transform: scale(0.75); }
+    14%  { opacity: 0.85; transform: scale(1.06); }
+    65%  { opacity: 0.5;  transform: scale(1); }
+    100% { opacity: 0;    transform: scale(1); }
+  }
+
+  .fx-slot {
+    position: absolute;
+    inset: -55%;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  /* удар мечом — дуга взмаха клинка, рисуется SVG-обводкой без внешних картинок */
+  .fx-slash {
+    position: absolute;
+    inset: 4%;
+    opacity: 0;
+    animation: slashPop 0.5s ease forwards;
+  }
+  .fx-slash svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .fx-slash path {
+    fill: none;
+    stroke: #f2e9d0;
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 150;
+    stroke-dashoffset: 150;
+    filter: drop-shadow(0 0 6px rgba(255,255,255,0.75));
+    animation: slashDraw 0.32s ease forwards;
+  }
+  @keyframes slashDraw { to { stroke-dashoffset: 0; } }
+  @keyframes slashPop {
+    0%   { opacity: 0; }
+    10%  { opacity: 1; }
+    75%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* укус — два ряда клыков смыкаются, рисуется CSS-треугольниками без внешних картинок */
+  .fx-bite-marks {
+    position: absolute;
+    inset: 14%;
+  }
+  .fx-bite-marks .tooth {
+    position: absolute;
+    width: 11%;
+    height: 38%;
+    background: linear-gradient(180deg, #f4ecd8, #cbbf9e);
+    opacity: 0;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+    animation: toothClamp 0.5s ease forwards;
+  }
+  .fx-bite-marks .tooth.top {
+    top: 0;
+    clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+    transform-origin: top center;
+  }
+  .fx-bite-marks .tooth.bottom {
+    bottom: 0;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    transform-origin: bottom center;
+  }
+  @keyframes toothClamp {
+    0%   { opacity: 0; transform: scaleY(0.3); }
+    30%  { opacity: 1; transform: scaleY(1.15); }
+    70%  { opacity: 1; transform: scaleY(1); }
+    100% { opacity: 0; transform: scaleY(1); }
+  }
+
+  /* щит разбит — та же форма щита, что и при поднятии, раскалывается на две половины */
+  .fx-shield-break {
+    position: absolute;
+    inset: 0;
+  }
+  .fx-shield-break .half {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 60px; height: 72px;
+    margin: -36px 0 0 -30px;
+    background: linear-gradient(180deg, #746a5b, #3a352c 55%, #221f19);
+    opacity: 0;
+  }
+  .fx-shield-break .half.left {
+    clip-path: polygon(50% 0%, 50% 100%, 0% 58%, 0% 18%);
+    animation: shieldBreakLeft 0.75s ease forwards;
+  }
+  .fx-shield-break .half.right {
+    clip-path: polygon(50% 0%, 100% 18%, 100% 58%, 50% 100%);
+    animation: shieldBreakRight 0.75s ease forwards;
+  }
+  .fx-shield-break .crack {
+    position: absolute;
+    inset: 22%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.9), rgba(255,80,60,0.5) 55%, transparent 75%);
+    opacity: 0;
+    animation: crackFlash 0.5s ease forwards;
+  }
+  @keyframes shieldBreakLeft {
+    0%   { opacity: 1; transform: translate(0,0) rotate(0deg); }
+    100% { opacity: 0; transform: translate(-20px, 16px) rotate(-30deg); }
+  }
+  @keyframes shieldBreakRight {
+    0%   { opacity: 1; transform: translate(0,0) rotate(0deg); }
+    100% { opacity: 0; transform: translate(20px, 16px) rotate(30deg); }
+  }
+  @keyframes crackFlash {
+    0%   { opacity: 0; }
+    15%  { opacity: 1; }
+    40%  { opacity: 0.2; }
+    100% { opacity: 0; }
+  }
+
+  /* удар мечом: атакующий слегка подаётся вперёд */
+  .avatar-circle.player.attack-lunge { animation: playerLunge 0.5s ease; }
+  @keyframes playerLunge {
+    0%   { transform: translateX(0); }
+    35%  { transform: translateX(16px) scale(1.03); }
+    100% { transform: translateX(0); }
+  }
+  /* волк атакует — тоже слегка подаётся вперёд, в сторону игрока */
+  .avatar-circle.enemy.wolf-lunge { animation: wolfLunge 0.5s ease; }
+  @keyframes wolfLunge {
+    0%   { transform: translateX(0); }
+    35%  { transform: translateX(-16px) scale(1.03); }
+    100% { transform: translateX(0); }
+  }
+  /* получение удара: короткий откат назад + мгновенное покраснение */
+  .avatar-circle.enemy.enemy-hit { animation: enemyRecoil 0.5s ease; }
+  @keyframes enemyRecoil {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(-10px); }
+    100% { transform: translateX(0); }
+  }
+  .avatar-circle.player.player-hit { animation: playerRecoil 0.5s ease; }
+  @keyframes playerRecoil {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(10px); }
+    100% { transform: translateX(0); }
+  }
+  .avatar-circle.enemy::after,
+  .avatar-circle.player::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #ff2b2b;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .avatar-circle.enemy.enemy-hit::after,
+  .avatar-circle.player.player-hit::after {
+    animation: redFlash 0.5s ease;
+  }
+  @keyframes redFlash {
+    0%   { opacity: 0; }
+    25%  { opacity: 0.6; }
+    60%  { opacity: 0.28; }
+    100% { opacity: 0; }
+  }
+
+  /* эффект поднятия щита — рисуется средствами CSS, без внешнего изображения */
+  .fx-shield-raise {
+    width: 62px; height: 72px;
+    background: linear-gradient(180deg, #f2e6c4, #b9ab84 55%, #8a7c58);
+    clip-path: polygon(50% 0%, 100% 18%, 100% 58%, 50% 100%, 0% 58%, 0% 18%);
+    box-shadow: 0 0 18px 4px rgba(232,216,176,0.65);
+    opacity: 0;
+    animation: shieldPop 0.75s ease forwards;
+  }
+  @keyframes shieldPop {
+    0%   { opacity: 0; transform: scale(0.4) translateY(6px); }
+    30%  { opacity: 1; transform: scale(1.08) translateY(0); }
+    75%  { opacity: 1; transform: scale(1) translateY(0); }
+    100% { opacity: 0; transform: scale(1.02) translateY(-4px); }
+  }
+
+  /* эффект удара когтями — рисуется средствами CSS, без внешнего изображения */
+  .fx-claw-marks {
+    width: 90px; height: 90px;
+    position: relative;
+    opacity: 0;
+    animation: clawPop 0.6s ease forwards;
+  }
+  .fx-claw-marks span {
+    position: absolute;
+    top: -10%;
+    width: 9%;
+    height: 130%;
+    background: linear-gradient(180deg, transparent, #c0392b 18%, #ff3b30 50%, #c0392b 82%, transparent);
+    border-radius: 3px;
+    transform: rotate(28deg);
+  }
+  .fx-claw-marks span:nth-child(1) { left: 18%; }
+  .fx-claw-marks span:nth-child(2) { left: 38%; animation-delay: 0.04s; }
+  .fx-claw-marks span:nth-child(3) { left: 58%; animation-delay: 0.08s; }
+  .fx-claw-marks span:nth-child(4) { left: 78%; animation-delay: 0.12s; }
+  @keyframes clawPop {
+    0%   { opacity: 0; }
+    20%  { opacity: 1; }
+    70%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* критический удар — усиленная вспышка поверх обычного отката/покраснения */
+  .avatar-circle.enemy.crit-hit::after { animation: critFlash 0.55s ease; }
+  @keyframes critFlash {
+    0%   { opacity: 0; }
+    20%  { opacity: 0.9; }
+    55%  { opacity: 0.4; }
+    100% { opacity: 0; }
+  }
+
+  /* выстрел лучника — быстрая стрела-полоса, летящая к цели */
+  .fx-arrow {
+    position: absolute;
+    top: 50%; left: 8%;
+    width: 84%; height: 5px;
+    background: linear-gradient(90deg, transparent, #e8d8b0 45%, #fff 80%, transparent);
+    transform: translateY(-50%) scaleX(0);
+    transform-origin: left center;
+    opacity: 0;
+    animation: arrowFly 0.42s ease forwards;
+  }
+  .fx-arrow::after {
+    content: '';
+    position: absolute;
+    right: -2px; top: 50%;
+    width: 0; height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 10px solid #fff;
+    transform: translateY(-50%);
+  }
+  @keyframes arrowFly {
+    0%   { opacity: 1; transform: translateY(-50%) scaleX(0); }
+    55%  { opacity: 1; transform: translateY(-50%) scaleX(1); }
+    100% { opacity: 0; transform: translateY(-50%) scaleX(1); }
+  }
+
+  /* уворот — размытый рывок в сторону */
+  .avatar-circle.player.dash-evade { animation: dashEvade 0.45s ease; }
+  @keyframes dashEvade {
+    0%   { transform: translateX(0); filter: none; }
+    30%  { transform: translateX(-18px); filter: blur(1.5px) brightness(1.2); }
+    60%  { transform: translateX(10px); filter: blur(0.5px); }
+    100% { transform: translateX(0); filter: none; }
+  }
+  .fx-evade-ring {
+    position: absolute;
+    inset: 8%;
+    border-radius: 50%;
+    border: 2px solid #7fd6e0;
+    opacity: 0;
+    animation: evadeRing 0.6s ease forwards;
+  }
+  @keyframes evadeRing {
+    0%   { opacity: 0.9; transform: scale(0.6); }
+    100% { opacity: 0;   transform: scale(1.5); }
+  }
+
+  /* самоисцеление — зелёное свечение и всплывающий «+N» */
+  .fx-heal-glow {
+    position: absolute; inset: -10%;
+    border-radius: 50%;
+    box-shadow: 0 0 22px 8px rgba(90,200,120,0.55);
+    opacity: 0;
+    animation: healGlow 0.9s ease forwards;
+  }
+  @keyframes healGlow {
+    0%   { opacity: 0; }
+    30%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  .fx-heal-text {
+    position: absolute;
+    left: 50%; top: 45%;
+    transform: translate(-50%, 0);
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #8be6a0;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+    opacity: 0;
+    animation: healFloat 1s ease forwards;
+    white-space: nowrap;
+  }
+  @keyframes healFloat {
+    0%   { opacity: 0; transform: translate(-50%, 0); }
+    20%  { opacity: 1; transform: translate(-50%, -6px); }
+    80%  { opacity: 1; transform: translate(-50%, -26px); }
+    100% { opacity: 0; transform: translate(-50%, -34px); }
+  }
+
+  /* огненный шар — пульсирующий огненный сгусток */
+  .fx-fireball {
+    position: absolute; inset: 12%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 45% 40%, #fff3c0, #ff9d2e 40%, #c0392b 72%, transparent 78%);
+    opacity: 0;
+    animation: firePulse 0.65s ease forwards;
+  }
+  @keyframes firePulse {
+    0%   { opacity: 0; transform: scale(0.4); }
+    30%  { opacity: 1; transform: scale(1.1); }
+    70%  { opacity: 0.85; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.05); }
+  }
+
+  /* цепь молний — зигзагообразный разряд */
+  .fx-lightning {
+    position: absolute;
+    top: 6%; left: 42%;
+    width: 16%; height: 88%;
+    opacity: 0;
+    animation: lightningFlicker 0.5s steps(1, end) forwards;
+  }
+  .fx-lightning svg { width: 100%; height: 100%; display: block; }
+  @keyframes lightningFlicker {
+    0%   { opacity: 0; }
+    10%  { opacity: 1; }
+    35%  { opacity: 0.2; }
+    50%  { opacity: 1; }
+    75%  { opacity: 0.3; }
+    100% { opacity: 0; }
+  }
+
+  /* магический щит — как обычный щит, но в холодных магических тонах со свечением */
+  .fx-shield-raise.magic {
+    background: linear-gradient(180deg, #cfe0f5, #7e9fd0 55%, #4c5f96);
+    box-shadow: 0 0 20px 6px rgba(140,170,240,0.7);
+  }
+
+  /* всплеск урона-отдачи от магического щита */
+  .fx-reflect-burst {
+    position: absolute; inset: 10%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(180,160,255,0.85), rgba(140,110,230,0.4) 55%, transparent 75%);
+    opacity: 0;
+    animation: firePulse 0.5s ease forwards;
+  }
+
+  .skill-icon {
+    width: 54px; height: 54px;
+    border-radius: 8px;
+    border: 1px solid var(--gold-dim);
+    background: rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex: 0 0 auto;
+    position: relative;
+    overflow: hidden;
+    transition: opacity 0.2s ease;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .skill-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    -webkit-touch-callout: none;
+    pointer-events: none;
+  }
+  .skill-icon.interactive { cursor: pointer; }
+  .skill-icon.interactive:active { border-color: var(--gold); }
+  .skill-icon.on-cd { opacity: 1; }
+  .skill-icon.on-cd img { opacity: 0.35; }
+  .skill-icon .cd-badge {
+    position: absolute;
+    inset: 0;
+    background: rgba(8,7,6,0.62);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold);
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+  }
+
+  .demo-dialogue {
+    flex: 0 0 auto;
+    min-height: 60px;
+    margin: 8px 16px;
+    background: rgba(20,19,18,0.55);
+    border: 1px solid rgba(232,216,176,0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+  }
+  .demo-dialogue p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .demo-dialogue .dmg { color: #e07a6b; font-weight: 600; }
+  .demo-dialogue .bleed { color: #8fbf7a; font-weight: 600; }
+  .demo-dialogue .stun { color: #e0b95a; font-weight: 600; }
+  .demo-dialogue .vamp { color: #ff4d6d; font-weight: 600; }
+  .demo-dialogue .poison { color: #5fbf5f; font-weight: 600; }
+  .demo-dialogue .berserk { color: #e05b3a; font-weight: 600; }
+
+  /* ===== ВСПЛЫВАЮЩЕЕ ОПИСАНИЕ СКИЛЛА (долгое нажатие) ===== */
+  .skill-tooltip-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 30px;
+    background: rgba(0,0,0,0.32);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  .skill-tooltip-overlay.show { opacity: 1; }
+  .skill-tooltip-card {
+    max-width: 320px;
+    background: rgba(20,19,18,0.88);
+    border: 1px solid rgba(232,216,176,0.45);
+    border-radius: 10px;
+    padding: 16px 18px;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.4);
+  }
+  .skill-tooltip-card .tt-name {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .skill-tooltip-card .tt-desc {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--text-dim);
+    text-align: center;
+  }
+  .skill-tooltip-card .tt-cd {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(232,216,176,0.25);
+    font-size: 13px;
+    color: var(--gold-dim);
+  }
+  .skill-tooltip-card .tt-cd .tt-clock { font-size: 14px; }
+  .skill-tooltip-card .tt-cd b { color: var(--gold); font-weight: 700; }
+
+  /* ===== ОКНО ИНФОРМАЦИИ О ПРОТИВНИКЕ (тап по аватару врага) ===== */
+  .avatar-circle.enemy { cursor: pointer; }
+  .avatar-circle.player { cursor: pointer; }
+  .enemy-info-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 26px;
+    background: rgba(0,0,0,0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .enemy-info-overlay.show { opacity: 1; pointer-events: auto; }
+  .enemy-info-card {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    background: rgba(20,19,18,0.94);
+    border: 1px solid rgba(232,216,176,0.45);
+    border-radius: 14px;
+    padding: 22px 20px 18px;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.5);
+  }
+  .enemy-info-close {
+    position: absolute;
+    top: 10px; right: 10px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(232,216,176,0.4);
+    background: rgba(0,0,0,0.35);
+    color: var(--gold-dim);
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .ei-name {
+    font-family: 'Cinzel', serif;
+    font-size: 17px;
+    letter-spacing: 1px;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  .ei-portrait {
+    width: 120px; height: 120px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1.5px solid #8a6fd0;
+    background: radial-gradient(circle at 40% 30%, #2a2438, #14111c);
+  }
+  .ei-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ei-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 2px;
+    font-size: 14.5px;
+    color: var(--text-dim);
+  }
+  .ei-icon {
+    width: 30px; height: 30px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  }
+  .ei-row b { color: var(--gold); font-weight: 700; }
+  .ei-divider { height: 1px; background: rgba(232,216,176,0.22); margin: 5px 0; }
+  .ei-drops { display: flex; flex-direction: column; }
+
+  /* ===== ОКНО ОКОНЧАНИЯ БОЯ (ПОБЕДА) ===== */
+  .victory-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 26px;
+    background: rgba(0,0,0,0.62);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .victory-overlay.show { opacity: 1; pointer-events: auto; }
+  .victory-card {
+    position: relative;
+    width: 100%;
+    max-width: 320px;
+    background: rgba(20,19,18,0.95);
+    border: 1px solid rgba(232,216,176,0.55);
+    border-radius: 14px;
+    padding: 24px 20px 20px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.55), 0 0 24px rgba(232,216,176,0.12);
+  }
+  .victory-title {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--gold);
+    text-align: center;
+    margin-bottom: 16px;
+    text-shadow: 0 2px 8px rgba(232,216,176,0.35);
+  }
+  .victory-rewards { display: flex; flex-direction: column; margin-bottom: 6px; }
+  .victory-loot-label {
+    font-size: 12.5px;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    margin: 8px 2px 6px;
+  }
+  .victory-loot-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .victory-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+    border-radius: 8px;
+    padding: 5px 10px 5px 6px;
+  }
+  .victory-item-icon {
+    width: 24px; height: 24px;
+    object-fit: contain;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5));
+  }
+  .victory-item span {
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .victory-empty {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 4px 2px 10px;
+  }
+  .victory-confirm-btn {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 12px 0;
+    background: rgba(232,216,176,0.08);
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    font-family: 'Cinzel', serif;
+    font-size: 13.5px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .victory-confirm-btn:active { background: rgba(232,216,176,0.18); }
+
+  /* ===== ЭКРАН ЛОКАЦИИ ===== */
+
+  .loc-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: rgba(10,10,12,0.55);
+    border-bottom: 1px solid rgba(232,216,176,0.22);
+  }
+  .burger-btn {
+    flex: 0 0 auto;
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .burger-btn span {
+    display: block;
+    width: 16px; height: 2px;
+    background: var(--gold);
+    border-radius: 1px;
+  }
+  .loc-header-bars {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .loc-header-bars .bar-row { margin-bottom: 0; }
+  .loc-header-bars .bar-label { width: 40px; }
+  .bar-fill.xp { background: linear-gradient(90deg, #8a7233, var(--gold)); }
+  .hub-avatar-btn {
+    flex: 0 0 auto;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    padding: 0;
+    overflow: hidden;
+    border: 1.5px solid #c0392b;
+    background: radial-gradient(circle at 40% 30%, #4a1f22, #221011);
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .hub-avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .loc-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 16px 28px;
+  }
+  .loc-title {
+    font-family: 'Cinzel', serif;
+    font-size: 17px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--gold-dim);
+    margin: 14px 0 16px;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.55);
+  }
+  .loc-section-label {
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 18px 2px 8px;
+  }
+  .loc-empty {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 6px 4px 10px;
+  }
+
+  .loc-enemy-row, .loc-drop-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(20,19,18,0.55);
+    border: 1px solid rgba(232,216,176,0.25);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+  .loc-enemy-row:active, .loc-drop-row:active { border-color: var(--gold); }
+
+  .loc-enemy-avatar {
+    flex: 0 0 auto;
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 1.5px solid #8a6fd0;
+    background: radial-gradient(circle at 40% 30%, #2a2438, #14111c);
+  }
+  .loc-enemy-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .loc-enemy-info { flex: 1; min-width: 0; }
+  .loc-enemy-name {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    color: var(--gold-dim);
+  }
+  .loc-enemy-level {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .loc-drop-icon {
+    flex: 0 0 auto;
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+  }
+  .loc-drop-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .loc-drop-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .loc-drop-timer {
+    flex: 0 0 auto;
+    font-family: 'Cinzel', serif;
+    font-size: 12.5px;
+    color: var(--gold-dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ===== БОКОВЫЕ ПАНЕЛИ-ЗАГЛУШКИ (МЕНЮ / ИНВЕНТАРЬ) ===== */
+  .side-menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0,0,0,0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .side-menu-overlay.show { opacity: 1; pointer-events: auto; }
+  .side-menu {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 78%;
+    max-width: 300px;
+    background: rgba(16,15,14,0.97);
+    padding: 22px 18px;
+    transition: transform 0.25s ease;
+  }
+  .side-menu.left {
+    left: 0;
+    border-right: 1px solid rgba(232,216,176,0.3);
+    transform: translateX(-100%);
+  }
+  .side-menu.right {
+    right: 0;
+    border-left: 1px solid rgba(232,216,176,0.3);
+    transform: translateX(100%);
+  }
+  .side-menu-overlay.show .side-menu { transform: translateX(0); }
+  .side-menu-title {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    color: var(--gold);
+    margin-bottom: 14px;
+  }
+  .side-menu-stub {
+    font-size: 14px;
+    color: var(--text-dim);
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  /* ===== ПУНКТЫ БОКОВОГО МЕНЮ (ПОРТАЛ И ПР.) ===== */
+  .menu-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(20,19,18,0.55);
+    border: 1px solid rgba(232,216,176,0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+    transition: border-color 0.15s ease;
+  }
+  .menu-item:active, .menu-item.open { border-color: var(--gold); }
+  .menu-item-icon {
+    flex: 0 0 auto;
+    width: 30px;
+    text-align: center;
+    font-size: 19px;
+    line-height: 1;
+  }
+  .menu-item-label {
+    flex: 1;
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+    color: var(--gold-dim);
+  }
+  .menu-item-arrow {
+    flex: 0 0 auto;
+    color: var(--gold-dim);
+    font-size: 16px;
+    transition: transform 0.2s ease;
+  }
+  .menu-item.open .menu-item-arrow { transform: rotate(90deg); color: var(--gold); }
+
+  .menu-sublist {
+    display: flex;
+    flex-direction: column;
+    max-height: 0;
+    overflow: hidden;
+    margin: -4px 0 8px 6px;
+    padding-left: 12px;
+    border-left: 1px solid rgba(232,216,176,0.25);
+    transition: max-height 0.25s ease;
+  }
+  .menu-sublist.open { max-height: 200px; }
+  .menu-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 6px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .menu-sub-row:active { opacity: 0.75; }
+  .menu-sub-icon {
+    flex: 0 0 auto;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+  }
+  .menu-sub-icon svg { width: 20px; height: 20px; display: block; }
+  .menu-sub-label {
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+
+  /* ===== МАГАЗИН СКУПЩИЦЫ ЛОЛИТЫ ===== */
+  .shop-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0,0,0,0.6);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .shop-overlay.show { opacity: 1; pointer-events: auto; }
+  .shop-panel {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8,7,6,0.35), rgba(6,5,4,0.55) 55%, rgba(6,5,4,0.88)),
+                url('assets/shop-lolita-bg.jpg') center 30% / cover no-repeat;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.28s ease;
+  }
+  .shop-overlay.show .shop-panel { transform: translateY(0); }
+  .shop-close-btn {
+    position: absolute;
+    top: 12px; right: 12px;
+    z-index: 3;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-size: 15px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  .shop-scene {
+    position: relative;
+    flex: 0 0 auto;
+    height: 40%;
+    min-height: 200px;
+    z-index: 2;
+  }
+  .shop-npc-portrait {
+    position: absolute;
+    right: -10%;
+    top: 3%;
+    height: 76%;
+    z-index: 1;
+    filter: drop-shadow(0 12px 16px rgba(0,0,0,0.5));
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .shop-dialog-box {
+    position: absolute;
+    left: 14px; top: 14px;
+    width: 46%;
+    max-width: 250px;
+    background: rgba(10,9,8,0.72);
+    border: 1.5px solid var(--gold);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .shop-npc-name {
+    font-family: 'Cinzel', serif;
+    font-size: 14.5px;
+    letter-spacing: 1px;
+    color: var(--gold);
+    margin-bottom: 6px;
+  }
+  .shop-dialog-text {
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--text-dim);
+  }
+
+  .shop-body {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: rgba(8,7,6,0.72);
+    border-top: 1px solid rgba(232,216,176,0.3);
+  }
+  .shop-gold-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 0 2px;
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    color: var(--gold);
+  }
+  .shop-gold-icon { width: 18px; height: 18px; object-fit: contain; }
+
+  .shop-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 10px 16px 0;
+  }
+  .shop-tab {
+    flex: 1;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 10px 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .shop-tab.active {
+    color: var(--gold);
+    background: rgba(232,216,176,0.1);
+    border-color: var(--gold);
+  }
+  .shop-tab-content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 16px calc(16px + env(safe-area-inset-bottom));
+    border: 1px solid rgba(232,216,176,0.3);
+    border-top: none;
+    border-radius: 0 0 10px 10px;
+    padding: 12px;
+  }
+  .shop-tab-pane { display: none; }
+  .shop-tab-pane.active { display: block; }
+
+  .shop-item-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(20,19,18,0.55);
+    border: 1px solid rgba(232,216,176,0.22);
+    border-radius: 8px;
+    padding: 9px 10px;
+    margin-bottom: 8px;
+  }
+  .shop-item-icon {
+    flex: 0 0 auto;
+    width: 34px; height: 34px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+    overflow: hidden;
+  }
+  .shop-item-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .shop-item-body { flex: 1; min-width: 0; }
+  .shop-item-name { font-size: 13.5px; color: var(--text-dim); }
+  .shop-item-have { font-size: 11.5px; color: var(--gold-dim); margin-top: 1px; }
+  .shop-item-desc { font-size: 11.5px; color: var(--text-dim); margin-top: 1px; font-style: italic; }
+  .shop-item-qty {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .shop-qty-btn {
+    width: 24px; height: 24px;
+    border-radius: 5px;
+    border: 1px solid var(--gold-dim);
+    background: transparent;
+    color: var(--gold);
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .shop-qty-btn:active { background: rgba(232,216,176,0.15); }
+  .shop-qty-value {
+    min-width: 18px;
+    text-align: center;
+    font-size: 13.5px;
+    color: var(--text);
+  }
+  .shop-item-price {
+    flex: 0 0 auto;
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: var(--gold);
+    min-width: 54px;
+    text-align: right;
+  }
+  .shop-sell-btn {
+    flex: 0 0 auto;
+    font-family: 'Cinzel', serif;
+    font-size: 11.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--gold);
+    background: transparent;
+    border: 1px solid var(--gold);
+    border-radius: 6px;
+    padding: 7px 9px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .shop-sell-btn:active { background: var(--gold); color: #33322c; }
+  .shop-sell-btn:disabled { opacity: 0.4; pointer-events: none; }
+  .shop-sell-btn.low-funds { opacity: 0.55; }
+  .shop-item-price.warn { color: #e05a4f; }
+  .shop-hint {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    padding: 6px 4px 10px;
+  }
+
+  /* ===== ИНВЕНТАРЬ ===== */
+  .inv-panel {
+    position: absolute;
+    inset: 0;
+    background: rgba(10,10,12,0.97);
+    display: flex;
+    flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+  }
+  .side-menu-overlay.show .inv-panel { transform: translateX(0); }
+  .inv-close-btn {
+    position: absolute;
+    top: 12px; right: 12px;
+    z-index: 2;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-size: 15px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .inv-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 40px 16px 26px;
+  }
+  .inv-nickname {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .inv-level-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 320px;
+    margin: 0 auto 18px;
+  }
+  .inv-level-row .bar-label { flex: 0 0 auto; }
+
+  .inv-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+  .inv-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .inv-slot {
+    width: 58px; height: 58px;
+    border: 2px solid var(--gold);
+    border-radius: 8px;
+    background: rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-size: 10.5px;
+    letter-spacing: 0.5px;
+    color: var(--gold-dim);
+    text-align: center;
+    line-height: 1.3;
+  }
+  .inv-slot.equip-slot { cursor: pointer; touch-action: manipulation; }
+  .inv-slot.equip-slot.filled { padding: 6px; border-color: var(--gold); background: rgba(232,216,176,0.08); }
+  .inv-slot.equip-slot.filled img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .inv-portrait {
+    flex: 0 0 auto;
+    width: 148px;
+    height: 194px;
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    overflow: hidden;
+    background: radial-gradient(circle at 50% 30%, rgba(70,60,40,0.25), rgba(0,0,0,0.35));
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  .inv-portrait img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: bottom center;
+    filter: drop-shadow(0 10px 14px rgba(0,0,0,0.45));
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  .inv-gold-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 14px;
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    color: var(--gold);
+  }
+  .inv-gold-icon { width: 20px; height: 20px; object-fit: contain; }
+
+  .inv-tabs {
+    display: flex;
+    gap: 6px;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+  .inv-tab {
+    flex: 1;
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 10px 4px;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .inv-tab.active {
+    color: var(--gold);
+    background: rgba(232,216,176,0.1);
+    border-color: var(--gold);
+  }
+  .inv-tab-content {
+    max-width: 420px;
+    margin: 0 auto;
+    border: 1px solid rgba(232,216,176,0.3);
+    border-radius: 0 0 10px 10px;
+    padding: 12px;
+    min-height: 150px;
+  }
+  .inv-tab-pane { display: none; }
+  .inv-tab-pane.active { display: block; }
+
+  .inv-item-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(20,19,18,0.5);
+    border: 1px solid rgba(232,216,176,0.22);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+  }
+  .inv-item-icon {
+    flex: 0 0 auto;
+    width: 34px; height: 34px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(232,216,176,0.3);
+    overflow: hidden;
+  }
+  .inv-item-icon img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .inv-item-body { flex: 1; min-width: 0; }
+  .inv-item-name { font-size: 13.5px; color: var(--text-dim); }
+  .inv-item-desc { font-size: 12px; color: var(--text-dim); opacity: 0.75; margin-top: 2px; line-height: 1.4; }
+  .inv-item-count {
+    flex: 0 0 auto;
+    font-family: 'Cinzel', serif;
+    font-size: 12.5px;
+    color: var(--gold-dim);
+  }
+  .inv-item-action-btn {
+    flex: 0 0 auto;
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--gold);
+    background: transparent;
+    border: 1px solid var(--gold);
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    touch-action: manipulation;
+    margin-left: 8px;
+  }
+  .inv-item-action-btn:active { background: var(--gold); color: #33322c; }
+  .inv-hint {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    font-style: italic;
+    text-align: center;
+    margin-top: 10px;
+  }
+
+  .inv-stat-points {
+    font-size: 13px;
+    color: var(--gold-dim);
+    text-align: center;
+    margin-bottom: 10px;
+  }
+  .inv-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 2px;
+    border-bottom: 1px solid rgba(232,216,176,0.15);
+    cursor: pointer;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .inv-stat-row:last-child { border-bottom: none; }
+  .inv-stat-name { font-size: 14px; color: var(--text); border-bottom: 1px dotted var(--gold-dim); display: inline-block; }
+  .inv-stat-right { display: flex; align-items: center; gap: 10px; }
+  .inv-stat-value {
+    font-family: 'Cinzel', serif;
+    font-size: 14px;
+    color: var(--gold);
+    min-width: 18px;
+    text-align: right;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .inv-stat-plus {
+    width: 25px; height: 25px;
+    border-radius: 6px;
+    border: 1px solid var(--gold);
+    background: rgba(232,216,176,0.08);
+    color: var(--gold);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .inv-stat-plus:disabled { opacity: 0.25; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="bg-layer"></div>
+<div id="app">
+
+  <!-- ===== ЭКРАН 1: ПРИВЕТСТВИЕ ===== -->
+  <section class="screen active" id="welcome-screen">
+    <div class="top-zone">
+      <div class="char-zone">
+        <picture>
+          <source srcset="assets/mage.webp" type="image/webp">
+          <img src="assets/mage.png" alt="Маг">
+        </picture>
+      </div>
+      <div class="text-zone">
+        <h1 style="font-family:'Cinzel',serif;font-size:19px;letter-spacing:1.5px;color:var(--gold);margin:0 0 14px;line-height:1.35;text-shadow:0 2px 6px rgba(0,0,0,0.35);">Добро пожаловать в мир Dark Tower</h1>
+        <p>Ты приходишь в себя посреди тёмного леса. Ветер шепчет что-то на языке, которого ты не помнишь. Тело ноет, будто после долгого сна — или падения.</p>
+        <p>Ты пытаешься вспомнить, кто ты... но память молчит. Единственное, что осталось — смутное чувство: где-то там, за деревьями, тебя уже ждут.</p>
+      </div>
+    </div>
+    <div class="bottom-zone">
+      <button class="btn-outline" id="to-select-btn">Выбрать персонажа</button>
+    </div>
+  </section>
+
+  <!-- ===== ЭКРАН: ВЫБОР ПОЛА ===== -->
+  <section class="screen" id="gender-screen">
+    <div class="top-zone" style="display:flex;align-items:center;justify-content:center;">
+      <div style="text-align:center;padding:0 26px;">
+        <h2 class="page-title" style="margin-bottom:18px;">Выбери облик</h2>
+        <p style="font-size:15.5px;line-height:1.5;color:var(--text-dim);max-width:320px;margin:0 auto;">Прежде чем идти дальше, реши, кем ты пробудился в этом лесу.</p>
+      </div>
+    </div>
+    <div class="bottom-zone" style="flex-direction:column;">
+      <button class="btn-outline" id="gender-male-btn">Мужской</button>
+      <button class="btn-outline" id="gender-female-btn">Женский</button>
+    </div>
+  </section>
+
+  <!-- ===== ЭКРАН ЛОКАЦИИ ===== -->
+  <section class="screen" id="location-screen">
+    <div class="loc-header">
+      <button class="burger-btn" id="burger-btn" aria-label="Меню">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="loc-header-bars">
+        <div class="bar-row">
+          <span class="bar-label">ХП</span>
+          <div class="bar-track"><div class="bar-fill hp" id="hub-hp-fill" style="width:100%"></div></div>
+          <span class="bar-value" id="hub-hp-value">100 / 100</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Ур. <b id="hub-level-value">1</b></span>
+          <div class="bar-track"><div class="bar-fill xp" id="hub-xp-fill" style="width:0%"></div></div>
+          <span class="bar-value" id="hub-xp-value">0 / 100</span>
+        </div>
+      </div>
+      <button class="hub-avatar-btn" id="hub-avatar-btn" aria-label="Инвентарь">
+        <img id="hub-avatar-img" src="" alt="">
+      </button>
+    </div>
+
+    <div class="loc-scroll">
+      <h2 class="loc-title" id="loc-title">Тёмный лес</h2>
+
+      <div class="loc-enemy-list" id="loc-enemy-list"></div>
+
+      <div class="loc-section-label">Недавняя добыча</div>
+      <div class="loc-drop-list" id="loc-drop-list"></div>
+    </div>
+  </section>
+
+  <!-- ===== СЦЕНА БОЯ ===== -->
+  <section class="screen" id="battle-demo-screen">
+    <h2 class="page-title">Бой</h2>
+
+    <!-- полоски врага -->
+    <div class="battle-bars">
+      <div class="unit-name">Одичавший волк</div>
+      <div class="bar-row">
+        <span class="bar-label">ХП</span>
+        <div class="bar-track"><div class="bar-fill hp" id="wolf-hp-fill" style="width:100%"></div></div>
+        <span class="bar-value" id="wolf-hp-value">25 / 25</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Броня</span>
+        <div class="bar-track"><div class="bar-fill armor" id="wolf-armor-fill" style="width:0%"></div></div>
+        <span class="bar-value" id="wolf-armor-value">0 / 10</span>
+      </div>
+    </div>
+
+    <!-- ряд врага: скиллы слева, аватар справа -->
+    <div class="combat-row enemy-row" id="enemy-skill-row">
+      <div class="skill-icon">
+        <img src="assets/skill-claw.webp" onerror="this.onerror=null;this.src='assets/skill-claw.png';" alt="Когти">
+      </div>
+      <div class="skill-icon">
+        <img src="assets/skill-bite.webp" onerror="this.onerror=null;this.src='assets/skill-bite.png';" alt="Укус">
+      </div>
+      <div class="avatar-col" id="enemy-avatar-col">
+        <div class="avatar-fx-wrap" id="enemy-avatar-wrap">
+          <div class="avatar-circle enemy">
+            <img src="assets/wolf-avatar.webp" onerror="this.onerror=null;this.src='assets/wolf-avatar.png';" alt="Одичавший волк">
+          </div>
+          <div class="blood-splat" id="enemy-blood-splat"></div>
+          <div class="fx-slot" id="enemy-fx-slot"></div>
+        </div>
+        <div class="status-row" id="enemy-status-row"></div>
+      </div>
+    </div>
+
+    <!-- диалог боя -->
+    <div class="demo-dialogue">
+      <p id="battle-dialogue-text">Волк напряжённо следит за тобой. Выбери скилл, чтобы начать бой.</p>
+    </div>
+
+    <!-- секция игрока: прижата к низу экрана -->
+    <div id="player-section">
+      <!-- ряд игрока: аватар по центру -->
+      <div class="combat-row player-row">
+        <div class="avatar-col">
+          <div class="avatar-fx-wrap" id="player-avatar-wrap">
+            <div class="avatar-circle player" id="player-avatar">⚔️</div>
+            <div class="blood-splat" id="player-blood-splat"></div>
+            <div class="fx-slot" id="player-fx-slot"></div>
+          </div>
+          <div class="status-row" id="player-status-row"></div>
+        </div>
+      </div>
+
+      <!-- полоски игрока -->
+      <div class="battle-bars">
+        <div class="unit-name" id="player-name-label">Герой</div>
+        <div class="bar-row">
+          <span class="bar-label">ХП</span>
+          <div class="bar-track"><div class="bar-fill hp" id="player-hp-fill" style="width:100%"></div></div>
+          <span class="bar-value" id="player-hp-value">100 / 100</span>
+        </div>
+        <div class="bar-row">
+          <span class="bar-label">Броня</span>
+          <div class="bar-track">
+            <div class="bar-fill armor-reserve" id="player-armor-reserve-fill" style="width:0%"></div>
+            <div class="bar-fill armor" id="player-armor-fill" style="width:0%"></div>
+          </div>
+          <span class="bar-value" id="player-armor-value">0 / 20</span>
+        </div>
+      </div>
+
+      <!-- скиллы игрока — отдельным рядом под полоской ХП, до 5 штук -->
+      <div class="player-skills-row" id="player-skill-row"></div>
+    </div>
+  </section>
+
+  <!-- всплывающее описание скилла (долгое нажатие) -->
+  <div class="skill-tooltip-overlay" id="skill-tooltip-overlay">
+    <div class="skill-tooltip-card">
+      <div class="tt-name" id="skill-tooltip-name"></div>
+      <div class="tt-desc" id="skill-tooltip-desc"></div>
+      <div class="tt-cd"><span class="tt-clock">🕐</span><b id="skill-tooltip-cd"></b></div>
+    </div>
+  </div>
+
+  <!-- информация о противнике (тап по аватару врага) -->
+  <div class="enemy-info-overlay" id="enemy-info-overlay">
+    <div class="enemy-info-card">
+      <button class="enemy-info-close" id="enemy-info-close" aria-label="Закрыть">✕</button>
+      <div class="ei-name" id="ei-name"></div>
+      <div class="ei-portrait"><img id="ei-portrait-img" src="" alt=""></div>
+      <div class="ei-row" id="ei-gold-row">
+        <img class="ei-icon" id="ei-gold-icon" src="" alt="">
+        <span id="ei-gold-text"></span>
+      </div>
+      <div class="ei-divider"></div>
+      <div class="ei-drops" id="ei-drops"></div>
+      <div class="ei-divider"></div>
+      <div class="ei-row" id="ei-xp-row">
+        <span class="ei-icon" style="display:flex;align-items:center;justify-content:center;font-size:20px;">✨</span>
+        <span id="ei-xp-text"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- окно окончания боя (победа) -->
+  <div class="victory-overlay" id="victory-overlay">
+    <div class="victory-card">
+      <div class="victory-title">Победа</div>
+      <div class="victory-rewards">
+        <div class="ei-row" id="victory-xp-row">
+          <span class="ei-icon" style="display:flex;align-items:center;justify-content:center;font-size:20px;">✨</span>
+          <span id="victory-xp-text"></span>
+        </div>
+        <div class="ei-row" id="victory-gold-row">
+          <img class="ei-icon" id="victory-gold-icon" src="" alt="">
+          <span id="victory-gold-text"></span>
+        </div>
+      </div>
+      <div class="victory-loot-label">Добыча:</div>
+      <div class="victory-loot-row" id="victory-loot-row"></div>
+      <button class="victory-confirm-btn" id="victory-confirm-btn">Подтвердить</button>
+    </div>
+  </div>
+
+  <!-- боковое меню-заглушка (бургер) -->
+  <div class="side-menu-overlay" id="burger-overlay">
+    <div class="side-menu left" id="burger-panel">
+      <div class="side-menu-title">Меню</div>
+      <div class="menu-list">
+        <div class="menu-item" id="menu-portal-btn">
+          <div class="menu-item-icon">🌀</div>
+          <div class="menu-item-label">Портал</div>
+          <div class="menu-item-arrow">›</div>
+        </div>
+        <div class="menu-sublist" id="menu-portal-list">
+          <div class="menu-sub-row" id="menu-portal-lolita">
+            <div class="menu-sub-icon">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M3 8.5L12 3.5L21 8.5" stroke="#e8d8b0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3 8.5L3.8 12M8 8.5L8.4 12M13 8.5L13 12M17.5 8.5L17.2 12M21 8.5L20.2 12" stroke="#e8d8b0" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M4.5 12H19.5V20H4.5V12Z" stroke="#b9ab84" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M4.5 16H19.5" stroke="#b9ab84" stroke-width="1.2"/>
+              </svg>
+            </div>
+            <div class="menu-sub-label">Скупщица Лолита</div>
+          </div>
+        </div>
+      </div>
+      <div class="side-menu-stub">Здесь скоро появится меню локаций, настройки и прочее.</div>
+    </div>
+  </div>
+
+  <!-- магазин скупщицы Лолиты -->
+  <div class="shop-overlay" id="shop-overlay">
+    <div class="shop-panel" id="shop-panel">
+      <button class="shop-close-btn" id="shop-close-btn">✕</button>
+
+      <img class="shop-npc-portrait" id="shop-npc-portrait" alt="Лолита" src="">
+
+      <div class="shop-scene">
+        <div class="shop-dialog-box">
+          <div class="shop-npc-name">Лолита</div>
+          <div class="shop-dialog-text" id="shop-dialog-text"></div>
+        </div>
+      </div>
+
+      <div class="shop-body">
+        <div class="shop-gold-row">
+          <img class="shop-gold-icon" id="shop-gold-icon" src="" alt="Золото">
+          <span id="shop-gold-value">0</span>
+        </div>
+
+        <div class="shop-tabs">
+          <button class="shop-tab active" id="shop-tab-btn-sell" data-tab="sell">Продажа</button>
+          <button class="shop-tab" id="shop-tab-btn-buy" data-tab="buy">Покупка</button>
+        </div>
+        <div class="shop-tab-content">
+          <div class="shop-tab-pane active" id="shop-pane-sell"></div>
+          <div class="shop-tab-pane" id="shop-pane-buy"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- инвентарь героя -->
+  <div class="side-menu-overlay" id="inventory-overlay">
+    <div class="inv-panel" id="inventory-panel">
+      <button class="inv-close-btn" id="inv-close-btn">✕</button>
+      <div class="inv-scroll">
+        <div class="inv-nickname" id="inv-nickname">Герой</div>
+        <div class="inv-level-row">
+          <span class="bar-label">Ур. <b id="inv-level-value">1</b></span>
+          <div class="bar-track"><div class="bar-fill xp" id="inv-xp-fill" style="width:0%"></div></div>
+          <span class="bar-value" id="inv-xp-value">0 / 100</span>
+        </div>
+
+        <div class="inv-stage">
+          <div class="inv-slots">
+            <div class="inv-slot equip-slot" id="equip-slot-weapon" data-slot="weapon">Оружие</div>
+            <div class="inv-slot">Слот 3</div>
+            <div class="inv-slot">Слот 5</div>
+          </div>
+          <div class="inv-portrait"><img id="inv-portrait-img" src="" alt=""></div>
+          <div class="inv-slots">
+            <div class="inv-slot equip-slot" id="equip-slot-shield" data-slot="shield">Щит</div>
+            <div class="inv-slot">Слот 4</div>
+            <div class="inv-slot">Слот 6</div>
+          </div>
+        </div>
+
+        <div class="inv-gold-row">
+          <img class="inv-gold-icon" id="inv-gold-icon" src="" alt="Золото">
+          <span id="inv-gold-value">0</span>
+        </div>
+
+        <div class="inv-tabs">
+          <button class="inv-tab active" id="inv-tab-btn-bag" data-tab="bag">Сумка</button>
+          <button class="inv-tab" id="inv-tab-btn-skills" data-tab="skills">Скиллы</button>
+          <button class="inv-tab" id="inv-tab-btn-stats" data-tab="stats">Уровень</button>
+        </div>
+        <div class="inv-tab-content">
+          <div class="inv-tab-pane active" id="inv-pane-bag"></div>
+          <div class="inv-tab-pane" id="inv-pane-skills"></div>
+          <div class="inv-tab-pane" id="inv-pane-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var characters = [
+    {
+      id: 'knight',
+      name: 'Рыцарь Палма',
+      cls: 'Воин ближнего боя',
+      img: 'assets/knight.webp',
+      imgFallback: 'assets/knight.png',
+      imgFemale: 'assets/knight-f.webp',
+      imgFallbackFemale: 'assets/knight-f.png',
+      desc: 'Некогда присягнувший павшему ордену, он носит доспехи, помнящие десятки безымянных полей битв. Меч и щит — всё, что осталось от клятвы, которую он всё ещё пытается сдержать.',
+      descFemale: 'Некогда присягнувшая павшему ордену, она носит доспехи, помнящие десятки безымянных полей битв. Меч и щит — всё, что осталось от клятвы, которую она всё ещё пытается сдержать.',
+      skills: [
+        '<b>Силовой удар</b> — тяжёлый урон в ближнем бою',
+        '<b>Кровопотеря</b> — раны врага кровоточат ещё несколько ходов'
+      ]
+    },
+    {
+      id: 'archer',
+      name: 'Страж леса',
+      cls: 'Разведчик-лучник',
+      img: 'assets/archer.webp',
+      imgFallback: 'assets/archer.png',
+      imgFemale: 'assets/archer-f.webp',
+      imgFallbackFemale: 'assets/archer-f.png',
+      desc: 'Дитя старого леса, выросшее среди теней и птичьего гомона. Стрелы находят цель раньше, чем враг успевает понять, откуда пришла опасность.',
+      skills: [
+        '<b>Скрытая атака</b> — высокий шанс критического урона из тени',
+        '<b>Самоисцеление</b> — восстанавливает часть здоровья в бою'
+      ]
+    },
+    {
+      id: 'wizard',
+      name: 'Ведьмак отшельник',
+      nameFemale: 'Ученица ведьмака',
+      cls: 'Сбалансированный маг',
+      img: 'assets/wizard.webp',
+      imgFallback: 'assets/wizard.png',
+      imgFemale: 'assets/wizard-f.webp',
+      imgFallbackFemale: 'assets/wizard-f.png',
+      desc: 'Годы одиночества в изгнании открыли ему знания, которых лучше было не касаться. Его посох помнит больше заклинаний, чем осталось имён у забытых им богов.',
+      descFemale: 'Годы одиночества в изгнании открыли ей знания, которых лучше было не касаться. Её посох помнит больше заклинаний, чем осталось имён у забытых ею богов.',
+      skills: [
+        '<b>Обширный арсенал</b> — множество разных заклинаний',
+        '<b>Баланс силы</b> — ровно держит и атаку, и защиту'
+      ]
+    }
+  ];
+
+  var current = 0;
+  var chosenHero = null;
+  var playerGender = 'male';
+
+  // данные для боя: иконки-плейсхолдеры (эмодзи) и, где есть, реальные ассеты
+  var heroBattleData = {
+    knight: {
+      name: 'Рыцарь Палма',
+      avatarIcon: '⚔️',
+      avatarImg: 'assets/knight-avatar',
+      avatarImgFemale: 'assets/knight-avatar-f',
+      skills: [
+        { icon: '⚔️', img: 'assets/skill-power-strike', name: 'Яростный удар', desc: 'Атакует цель, урон от 5 до 20. Шанс 25% наложить кровотечение на 3 хода.', cd: 1, remainingCd: 0, dmgMin: 5, dmgMax: 20, bleedChance: 0.25, bleedTurns: 3, fx: 'slash' },
+        { icon: '🛡️', img: 'assets/skill-shield-block', name: 'Поднять щит', desc: 'Даёт 15 единиц брони.', cd: 4, remainingCd: 0, armor: 15, fx: 'shieldRaise' },
+        { icon: '🛡️', img: 'assets/skill-armor-stance', name: 'Удар щитом', desc: 'Наносит урон цели от 5 до 15 единиц. Шанс 30% оглушить врага на один ход.', cd: 3, remainingCd: 0, dmgMin: 5, dmgMax: 15, stunChance: 0.3, stunTurns: 1, fx: 'slash' },
+        { icon: '💢', img: 'assets/skill-berserk', name: 'Берсерк', desc: 'Пассивная способность. Когда здоровье падает ниже 40%, урон всех атак героя увеличивается в 1,5 раза. Если здоровье падает ниже 20%, урон увеличивается в 2 раза. Эффект действует 3 хода, затем перезарядка 6 ходов.', cd: 6, remainingCd: 0, unlockLevel: 5, passive: true, activeTurns: 3, thresholdMid: 0.4, multMid: 1.5, thresholdLow: 0.2, multLow: 2 }
+      ]
+    },
+    archer: {
+      name: 'Страж леса',
+      avatarIcon: '🏹',
+      avatarImg: 'assets/archer-avatar',
+      avatarImgFemale: 'assets/archer-avatar-f',
+      skills: [
+        { icon: '🏹', img: 'assets/skill-aimed-shot', name: 'Меткий выстрел', desc: 'Точный выстрел, урон от 4 до 14. Шанс 25% нанести критический удар — двойной урон.', cd: 1, remainingCd: 0, dmgMin: 4, dmgMax: 14, critChance: 0.25, critMult: 2, fx: 'shot' },
+        { icon: '💨', img: 'assets/skill-evasion', name: 'Уворот', desc: 'На 3 хода даёт 30% шанс полностью увернуться от атаки противника.', cd: 5, remainingCd: 0, dodgeChance: 0.3, dodgeTurns: 3, fx: 'evade' },
+        { icon: '❤️', img: 'assets/skill-self-heal', name: 'Самоисцеление', desc: 'Восстанавливает 10% максимального здоровья.', cd: 6, remainingCd: 0, healPct: 0.10, fx: 'heal' },
+        { icon: '🗡️', img: 'assets/skill-poison-dagger', name: 'Ядовитый кинжал', desc: 'Наносит от 10 до 27 урона. Шанс 35% отравить противника на 4 хода — по 5 урона за ход.', cd: 3, remainingCd: 0, unlockLevel: 5, dmgMin: 10, dmgMax: 27, poisonChance: 0.35, poisonTurns: 4, poisonDmg: 5, fx: 'poison' }
+      ]
+    },
+    wizard: {
+      name: 'Ведьмак отшельник',
+      avatarIcon: '🔮',
+      avatarImg: 'assets/wizard-avatar',
+      avatarImgFemale: 'assets/wizard-avatar-f',
+      skills: [
+        { icon: '🔥', img: 'assets/skill-fireball', name: 'Огненный шар', desc: 'Наносит от 5 до 14 урона. Шанс 20% полностью отключить броню противника на 2 хода.', cd: 1, remainingCd: 0, dmgMin: 5, dmgMax: 14, disableArmorChance: 0.2, disableArmorTurns: 2, fx: 'fire' },
+        { icon: '⚡', img: 'assets/skill-chain-lightning', name: 'Цепь молний', desc: 'Бьёт цель на 4–10 урона. Шанс 30% на второй разряд по той же цели, наносящий 7–16 урона.', cd: 3, remainingCd: 0, dmgMin: 4, dmgMax: 10, chainChance: 0.3, chainDmgMin: 7, chainDmgMax: 16, fx: 'chain' },
+        { icon: '🔮', img: 'assets/skill-magic-shield', name: 'Магический щит', desc: 'Даёт 12 единиц брони. Если противник одним ударом полностью пробивает этот щит, он получает урон в размере 5% от собственной атаки.', cd: 3, remainingCd: 0, armor: 12, reflectPct: 0.05, fx: 'magicShield' },
+        { icon: '🐇', img: 'assets/skill-transform', name: 'Превращение', desc: 'Превращает противника в безобидное животное на 2 хода: его броня отключается на 2 хода, а урон его атак снижается до 5 единиц за ход. Перезарядка 5 ходов.', cd: 5, remainingCd: 0, unlockLevel: 5, transformTurns: 2, disableArmorTurns: 2, transformAtk: 5, fx: 'transform' }
+      ]
+    }
+  };
+
+  // возвращает путь к аватарке героя (боевой круглый значок) с учётом выбранного пола
+  function heroAvatarImg(heroId) {
+    var d = heroBattleData[heroId];
+    return (playerGender === 'female' && d.avatarImgFemale) ? d.avatarImgFemale : d.avatarImg;
+  }
+
+  // первый противник — одичавший волк (реальные ассеты)
+  var wolfBattleData = {
+    name: 'Одичавший волк',
+    level: 1,
+    avatarIcon: '🐺',
+    avatarImg: 'assets/wolf-avatar',
+    hp: 25,
+    maxHp: 25,
+    maxArmor: 10,
+    skills: [
+      { icon: '🐾', img: 'assets/skill-claw', name: 'Удар когтями', desc: 'Наносит от 3 до 10 урона и на 2 хода отключает броню противника — всё это время урон проходит сквозь неё, но сама броня остаётся в запасе. Новую броню поднимать по-прежнему можно. По истечении 2 ходов отключённая броня полностью возвращается.', cd: 2, remainingCd: 0, dmgMin: 3, dmgMax: 10, disableShieldTurns: 2, fx: 'claw' },
+      { icon: '😾', img: 'assets/skill-bite', name: 'Укус', desc: 'Наносит от 3 до 15 урона и накладывает на противника кровотечение на 2 хода.', cd: 2, remainingCd: 0, dmgMin: 3, dmgMax: 15, bleedTurns: 2, fx: 'bite' }
+    ],
+    loot: {
+      goldMin: 3,
+      goldMax: 13,
+      goldIcon: 'assets/loot-gold',
+      xp: 20,
+      drops: [
+        { name: 'Волчий хвост', img: 'assets/loot-tail', chance: 0.15 },
+        { name: 'Кости', img: 'assets/loot-bone', chance: 0.25 },
+        { name: 'Клык', img: 'assets/loot-fang', chance: 0.08 }
+      ]
+    }
+  };
+
+  // второй противник — зомби (уровень 3): те же два скилла, что у волка (когти + укус),
+  // и третья, уникальная способность — «Жажда крови» (баф вампиризма для самого зомби)
+  var zombieBattleData = {
+    name: 'Зомби',
+    level: 3,
+    avatarIcon: '🧟',
+    avatarImg: 'assets/zombie-avatar',
+    hp: 75,
+    maxHp: 75,
+    maxArmor: 12,
+    skills: [
+      { icon: '🐾', img: 'assets/skill-claw', name: 'Удар когтями', desc: 'Наносит от 7 до 14 урона и на 2 хода отключает броню противника — всё это время урон проходит сквозь неё, но сама броня остаётся в запасе. Новую броню поднимать по-прежнему можно. По истечении 2 ходов отключённая броня полностью возвращается.', cd: 2, remainingCd: 0, dmgMin: 7, dmgMax: 14, disableShieldTurns: 2, fx: 'claw' },
+      { icon: '😾', img: 'assets/skill-bite', name: 'Укус', desc: 'Наносит от 7 до 19 урона и накладывает на противника кровотечение на 2 хода.', cd: 2, remainingCd: 0, dmgMin: 7, dmgMax: 19, bleedTurns: 2, fx: 'bite' },
+      { icon: '🩸', img: 'assets/skill-bloodlust', name: 'Жажда крови', desc: 'Зомби впадает в ярость: на 4 хода получает вампиризм — 50% урона, нанесённого его атаками, возвращается ему в виде здоровья. Перезарядка 6 ходов.', cd: 6, remainingCd: 0, vampPct: 0.5, vampTurns: 4, fx: 'bloodlust' }
+    ],
+    loot: {
+      goldMin: 8,
+      goldMax: 20,
+      goldIcon: 'assets/loot-gold',
+      xp: 40,
+      drops: [
+        { name: 'Гнилые кости', img: 'assets/loot-bone', chance: 0.25 },
+        { name: 'Зомби-клык', img: 'assets/loot-fang', chance: 0.10 }
+      ]
+    }
+  };
+
+  // реестр типов врагов: по строковому ключу type у элемента локации находим его боевые данные
+  var enemyTypesData = { wolf: wolfBattleData, zombie: zombieBattleData };
+
+  // ===== СОСТОЯНИЕ БОЯ =====
+  // текущие боевые данные противника — переключаются при входе в бой в зависимости от того,
+  // на кого из списка локации напал игрок (волк или зомби)
+  var currentEnemyData = wolfBattleData;
+  var wolfState = { hp: 25, maxHp: 25, armor: 0, maxArmor: 10, bleedTurns: 0, bleedDmg: 3, stunTurns: 0, armorDisabledTurns: 0, vampTurns: 0, vampPct: 0, poisonTurns: 0, poisonDmg: 0, transformTurns: 0, alive: true };
+  var playerState = { hp: 100, maxHp: 100, armor: 0, maxArmor: 20, armorReserve: 0, bleedTurns: 0, bleedDmg: 3, shieldDisabledTurns: 0, dodgeChance: 0, dodgeTurns: 0, magicShieldReflectPct: 0, berserkTurns: 0, berserkCd: 0, alive: true };
+  var battleBusy = false;
+  var lastPlayerReflect = 0;
+
+  // ===== СОСТОЯНИЕ ЛОКАЦИИ (сохраняется между боями) =====
+  var playerProfile = { level: 1, xp: 0, xpToNext: 100, hp: 100, maxHp: 100 };
+  var playerGold = 0;
+  var bagItems = [];
+
+  // ===== ОПРЕДЕЛЕНИЯ ПРЕДМЕТОВ =====
+  // по названию предмета определяем, что это: экипируемое оружие/щит или расходуемое зелье
+  var ITEM_DEFS = {
+    'Кинжал': { type: 'equip', slot: 'weapon', dmgBonus: 5 },
+    'Щит': { type: 'equip', slot: 'shield', armorBonus: 15, armorReserveBonus: 5 },
+    'Большая банка целебного зелья': { type: 'potion', heal: 75 },
+    'Малая банка целебного зелья': { type: 'potion', heal: 25 }
+  };
+
+  // экипированные предметы героя: оружие даёт бонус к урону, щит — к броне
+  var playerEquip = { weapon: null, shield: null };
+
+  function getWeaponDmgBonus() {
+    return (playerEquip.weapon && playerEquip.weapon.dmgBonus) || 0;
+  }
+  function getShieldArmorBonus() {
+    return (playerEquip.shield && playerEquip.shield.armorBonus) || 0;
+  }
+  function getShieldArmorReserveBonus() {
+    return (playerEquip.shield && playerEquip.shield.armorReserveBonus) || 0;
+  }
+  var statPoints = 0;
+  var playerStats = { attack: 5, health: 10, defense: 5, luck: 5, strength: 5, agility: 5, intellect: 5 };
+  var statLabels = { attack: 'Атака', health: 'Здоровье', defense: 'Защита', luck: 'Удача', strength: 'Сила', agility: 'Ловкость', intellect: 'Интеллект' };
+
+  // базовые (стартовые) значения статов — бонусы считаются от очков, вложенных СВЕРХ этой базы
+  var BASE_STATS = { attack: 5, health: 10, defense: 5, luck: 5, strength: 5, agility: 5, intellect: 5 };
+  function statPointsInvested(key) {
+    return Math.max(0, playerStats[key] - BASE_STATS[key]);
+  }
+
+  // ===== БОНУСЫ ОТ ПРОКАЧКИ СТАТОВ =====
+  function getAttackDmgBonus() { return statPointsInvested('attack') * 2; }
+  function getStrengthDmgBonus() { return statPointsInvested('strength') * 2; }
+  function getStrengthHealBonus() { return statPointsInvested('strength') * 2; }
+  function getIntellectDmgBonus() { return statPointsInvested('intellect') * 2; }
+  function getDefenseArmorReserveBonus() { return statPointsInvested('defense') * 3; }
+  function getDefenseSkillArmorBonus() { return statPointsInvested('defense') * 2; }
+  function getLuckPct() { return statPointsInvested('luck') * 0.01; }
+  // резерв на будущее: снижает шансы вражеских способностей, когда у врагов появятся собственные %-эффекты
+  function getAgilityPct() { return statPointsInvested('agility') * 0.01; }
+
+  function luckBoost(chance) { return Math.min(1, chance + getLuckPct()); }
+
+  // суммарный бонус к урону скилла героя: оружие + очки «Атака» + (Интеллект — для мага, Сила — для остальных)
+  function getSkillDmgBonus() {
+    var classBonus = (chosenHero && chosenHero.id === 'wizard') ? getIntellectDmgBonus() : getStrengthDmgBonus();
+    return getWeaponDmgBonus() + getAttackDmgBonus() + classBonus;
+  }
+
+  // ===== ОТКРЫТИЕ НОВЫХ СКИЛЛОВ ПО УРОВНЮ =====
+  // скилл считается открытым, если у него нет unlockLevel или уровень героя уже его достиг
+  function isSkillUnlocked(skill) {
+    return !skill.unlockLevel || playerProfile.level >= skill.unlockLevel;
+  }
+  // скиллы, доступные для использования в бою: открытые по уровню и не пассивные
+  function getBattleSkills(data) {
+    return data.skills.filter(function (s) { return isSkillUnlocked(s) && !s.passive; });
+  }
+
+  // ===== БЕРСЕРК (пассивный скилл рыцаря) =====
+  function getKnightBerserkSkill() {
+    return heroBattleData.knight.skills.filter(function (s) { return s.name === 'Берсерк'; })[0];
+  }
+  // множитель урона от берсерка: активен только у рыцаря, пока действует баф
+  function getBerserkMultiplier() {
+    if (!chosenHero || chosenHero.id !== 'knight' || playerState.berserkTurns <= 0) return 1;
+    var bSkill = getKnightBerserkSkill();
+    if (!bSkill) return 1;
+    var pct = playerState.hp / playerState.maxHp;
+    return pct <= bSkill.thresholdLow ? bSkill.multLow : bSkill.multMid;
+  }
+  // проверяет, не пора ли активировать берсерк (вызывается после любого урона игроку)
+  function checkBerserkTrigger(lines) {
+    if (!chosenHero || chosenHero.id !== 'knight' || !playerState.alive) return;
+    var bSkill = getKnightBerserkSkill();
+    if (!bSkill || !isSkillUnlocked(bSkill)) return;
+    if (playerState.berserkTurns > 0 || playerState.berserkCd > 0) return;
+    var pct = playerState.hp / playerState.maxHp;
+    if (pct < bSkill.thresholdMid) {
+      playerState.berserkTurns = bSkill.activeTurns;
+      if (lines) lines.push('<span class="berserk">Берсерк пробуждается: урон героя растёт на ' + bSkill.activeTurns + ' хода!</span>');
+      renderPlayerStatuses();
+    }
+  }
+  var locationEnemies = [
+    { name: wolfBattleData.name, level: wolfBattleData.level, avatarImg: wolfBattleData.avatarImg, type: 'wolf', alive: true },
+    { name: wolfBattleData.name, level: wolfBattleData.level, avatarImg: wolfBattleData.avatarImg, type: 'wolf', alive: true },
+    { name: wolfBattleData.name, level: wolfBattleData.level, avatarImg: wolfBattleData.avatarImg, type: 'wolf', alive: true },
+    { name: zombieBattleData.name, level: zombieBattleData.level, avatarImg: zombieBattleData.avatarImg, type: 'zombie', alive: true },
+    { name: zombieBattleData.name, level: zombieBattleData.level, avatarImg: zombieBattleData.avatarImg, type: 'zombie', alive: true }
+  ];
+  var activeEnemyId = null;
+  var dropList = [];
+  var dropIdCounter = 0;
+  var pendingVictoryDrops = [];
+  var pendingVictoryGold = 0;
+
+  // ===== ПОЯВЛЕНИЕ ВРАГОВ СО ВРЕМЕНЕМ =====
+  // раз в 30 секунд на локации появляется новый враг (60% волк / 40% зомби),
+  // но не более 9 живых врагов одновременно
+  var SPAWN_INTERVAL_MS = 30000;
+  var MAX_ALIVE_ENEMIES = 9;
+  var WOLF_SPAWN_CHANCE = 0.6;
+  var nextSpawnAt = Date.now() + SPAWN_INTERVAL_MS;
+
+  function aliveEnemyCount() {
+    return locationEnemies.filter(function (en) { return en.alive; }).length;
+  }
+
+  function spawnLocationEnemy() {
+    if (aliveEnemyCount() >= MAX_ALIVE_ENEMIES) return;
+    var type = Math.random() < WOLF_SPAWN_CHANCE ? 'wolf' : 'zombie';
+    var data = enemyTypesData[type];
+    locationEnemies.push({ name: data.name, level: data.level, avatarImg: data.avatarImg, type: type, alive: true });
+    if (document.getElementById('location-screen').classList.contains('active')) {
+      renderLocationEnemies();
+    }
+  }
+
+  function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+  function setDialogue(html) {
+    document.getElementById('battle-dialogue-text').innerHTML = html;
+  }
+
+  function renderWolfBars() {
+    var hpPct = Math.round(wolfState.hp / wolfState.maxHp * 100);
+    var armorPct = Math.round(wolfState.armor / wolfState.maxArmor * 100);
+    document.getElementById('wolf-hp-fill').style.width = hpPct + '%';
+    document.getElementById('wolf-hp-value').textContent = wolfState.hp + ' / ' + wolfState.maxHp;
+    document.getElementById('wolf-armor-fill').style.width = armorPct + '%';
+    document.getElementById('wolf-armor-value').textContent = wolfState.armor + ' / ' + wolfState.maxArmor;
+  }
+
+  function renderPlayerBars() {
+    var hpPct = Math.round(playerState.hp / playerState.maxHp * 100);
+    document.getElementById('player-hp-fill').style.width = hpPct + '%';
+    document.getElementById('player-hp-value').textContent = playerState.hp + ' / ' + playerState.maxHp;
+    var armorPct = Math.round(playerState.armor / playerState.maxArmor * 100);
+    document.getElementById('player-armor-fill').style.width = armorPct + '%';
+    var reserve = playerState.armorReserve || 0;
+    var reservePct = Math.round(reserve / playerState.maxArmor * 100);
+    document.getElementById('player-armor-reserve-fill').style.width = reservePct + '%';
+    document.getElementById('player-armor-value').textContent = playerState.armor + ' / ' + playerState.maxArmor + (reserve > 0 ? ' (+' + reserve + ' в запасе)' : '');
+  }
+
+  // урон по волку: сначала гасится бронёй (если не отключена), потом снимается ХП.
+  function damageWolf(amount, ignoreArmor) {
+    if (!wolfState.alive) return 0;
+    var beforeHp = wolfState.hp;
+    var dmg = amount;
+    if (!ignoreArmor && wolfState.armor > 0 && wolfState.armorDisabledTurns === 0) {
+      var absorbed = Math.min(wolfState.armor, dmg);
+      wolfState.armor -= absorbed;
+      dmg -= absorbed;
+    }
+    wolfState.hp = Math.max(0, wolfState.hp - dmg);
+    if (wolfState.hp <= 0) wolfState.alive = false;
+    renderWolfBars();
+    if (wolfState.hp < beforeHp) spawnBlood('enemy-blood-splat');
+    return amount;
+  }
+
+  // урон по игроку: сначала гасится бронёй (если щит не отключён), потом снимается ХП.
+  // если броня получена от «Магического щита» и именно этим ударом пробита полностью — атакующий получает урон-отдачу.
+  function damagePlayer(amount, ignoreArmor) {
+    lastPlayerReflect = 0;
+    if (!playerState.alive) return 0;
+    var beforeHp = playerState.hp;
+    var hadArmor = playerState.armor;
+    var dmg = amount;
+    if (!ignoreArmor && playerState.armor > 0 && playerState.shieldDisabledTurns === 0) {
+      var absorbed = Math.min(playerState.armor, dmg);
+      playerState.armor -= absorbed;
+      dmg -= absorbed;
+    }
+    var shieldJustBroke = !ignoreArmor && hadArmor > 0 && playerState.armor === 0;
+    playerState.hp = Math.max(0, playerState.hp - dmg);
+    if (playerState.hp <= 0) playerState.alive = false;
+    renderPlayerBars();
+    if (playerState.hp < beforeHp) spawnBlood('player-blood-splat');
+    if (shieldJustBroke && playerState.magicShieldReflectPct > 0) {
+      lastPlayerReflect = Math.max(1, Math.round(amount * playerState.magicShieldReflectPct));
+      playerState.magicShieldReflectPct = 0;
+      damageWolf(lastPlayerReflect, true);
+    }
+    return amount;
+  }
+
+  // показывает полупрозрачное пятно крови на аватаре и убирает его через мгновение
+  function spawnBlood(splatId) {
+    var el = document.getElementById(splatId);
+    if (!el) return;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    setTimeout(function () { el.classList.remove('show'); }, 1350);
+  }
+
+  function renderSkillBadges() {
+    if (!chosenHero) return;
+    var data = heroBattleData[chosenHero.id];
+    var row = document.getElementById('player-skill-row');
+    getBattleSkills(data).forEach(function (s, i) {
+      var box = row.querySelector('.skill-icon[data-idx="' + i + '"]');
+      if (!box) return;
+      var badge = box.querySelector('.cd-badge');
+      if (s.remainingCd > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'cd-badge';
+          box.appendChild(badge);
+        }
+        badge.textContent = s.remainingCd;
+        box.classList.add('on-cd');
+      } else {
+        if (badge) badge.remove();
+        box.classList.remove('on-cd');
+      }
+    });
+  }
+
+  function renderEnemySkillBadges() {
+    var row = document.getElementById('enemy-skill-row');
+    currentEnemyData.skills.forEach(function (s, i) {
+      var box = row.querySelector('.skill-icon[data-enemy-idx="' + i + '"]');
+      if (!box) return;
+      var badge = box.querySelector('.cd-badge');
+      if (s.remainingCd > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'cd-badge';
+          box.appendChild(badge);
+        }
+        badge.textContent = s.remainingCd;
+        box.classList.add('on-cd');
+      } else {
+        if (badge) badge.remove();
+        box.classList.remove('on-cd');
+      }
+    });
+  }
+
+  function tickCooldowns() {
+    if (!chosenHero) return;
+    var data = heroBattleData[chosenHero.id];
+    getBattleSkills(data).forEach(function (s) {
+      if (s.remainingCd > 0) s.remainingCd--;
+    });
+    renderSkillBadges();
+  }
+
+  function tickWolfCooldowns() {
+    currentEnemyData.skills.forEach(function (s) {
+      if (s.remainingCd > 0) s.remainingCd--;
+    });
+    renderEnemySkillBadges();
+  }
+
+  // есть ли у игрока хоть один скилл, который сейчас можно использовать
+  function playerHasUsableSkill() {
+    if (!chosenHero) return true;
+    var data = heroBattleData[chosenHero.id];
+    return getBattleSkills(data).some(function (s) {
+      return s.remainingCd === 0;
+    });
+  }
+
+  // ===== ДИНАМИЧЕСКОЕ ОПИСАНИЕ СКИЛЛА С УЧЁТОМ ТЕКУЩИХ СТАТОВ =====
+  // проценты показываются уже с учётом «Удачи», урон/броня/лечение — с учётом соответствующих статов
+  function pctWithLuck(chance) { return Math.round(luckBoost(chance) * 100); }
+
+  function getSkillDesc(skill) {
+    var dmgBonus = getSkillDmgBonus();
+    var defBonus = getDefenseSkillArmorBonus();
+    var healBonus = getStrengthHealBonus();
+
+    switch (skill.name) {
+      case 'Яростный удар':
+        return 'Атакует цель, урон от ' + (skill.dmgMin + dmgBonus) + ' до ' + (skill.dmgMax + dmgBonus) + '. Шанс ' + pctWithLuck(skill.bleedChance) + '% наложить кровотечение на ' + skill.bleedTurns + ' хода.';
+      case 'Поднять щит':
+        return 'Даёт ' + (skill.armor + defBonus) + ' единиц брони.';
+      case 'Удар щитом':
+        return 'Наносит урон цели от ' + (skill.dmgMin + dmgBonus) + ' до ' + (skill.dmgMax + dmgBonus) + ' единиц. Шанс ' + pctWithLuck(skill.stunChance) + '% оглушить врага на один ход.';
+      case 'Меткий выстрел':
+        return 'Точный выстрел, урон от ' + (skill.dmgMin + dmgBonus) + ' до ' + (skill.dmgMax + dmgBonus) + '. Шанс ' + pctWithLuck(skill.critChance) + '% нанести критический удар — двойной урон.';
+      case 'Уворот':
+        return 'На ' + skill.dodgeTurns + ' хода даёт ' + pctWithLuck(skill.dodgeChance) + '% шанс полностью увернуться от атаки противника.';
+      case 'Самоисцеление':
+        var healPctText = 'Восстанавливает ' + Math.round(skill.healPct * 100) + '% максимального здоровья';
+        return healBonus > 0 ? healPctText + ' + ' + healBonus + ' от Силы.' : healPctText + '.';
+      case 'Огненный шар':
+        return 'Наносит от ' + (skill.dmgMin + dmgBonus) + ' до ' + (skill.dmgMax + dmgBonus) + ' урона. Шанс ' + pctWithLuck(skill.disableArmorChance) + '% полностью отключить броню противника на ' + skill.disableArmorTurns + ' хода.';
+      case 'Цепь молний':
+        return 'Бьёт цель на ' + (skill.dmgMin + dmgBonus) + '–' + (skill.dmgMax + dmgBonus) + ' урона. Шанс ' + pctWithLuck(skill.chainChance) + '% на второй разряд по той же цели, наносящий ' + (skill.chainDmgMin + dmgBonus) + '–' + (skill.chainDmgMax + dmgBonus) + ' урона.';
+      case 'Магический щит':
+        return 'Даёт ' + (skill.armor + defBonus) + ' единиц брони. Если противник одним ударом полностью пробивает этот щит, он получает урон в размере ' + Math.round(skill.reflectPct * 100) + '% от собственной атаки.';
+      case 'Ядовитый кинжал':
+        return 'Наносит от ' + (skill.dmgMin + dmgBonus) + ' до ' + (skill.dmgMax + dmgBonus) + ' урона. Шанс ' + pctWithLuck(skill.poisonChance) + '% отравить противника на ' + skill.poisonTurns + ' хода (' + skill.poisonDmg + ' урона за ход).';
+      default:
+        return skill.desc;
+    }
+  }
+
+  function showInfoTooltip(name, desc, footer) {
+    document.getElementById('skill-tooltip-name').textContent = name;
+    document.getElementById('skill-tooltip-desc').textContent = desc;
+    document.getElementById('skill-tooltip-cd').textContent = footer || '';
+    document.querySelector('#skill-tooltip-overlay .tt-cd').style.display = footer ? 'flex' : 'none';
+    document.getElementById('skill-tooltip-overlay').classList.add('show');
+  }
+
+  function showSkillTooltip(skill) {
+    showInfoTooltip(skill.name, getSkillDesc(skill), skill.cd + (skill.cd === 1 ? ' ход' : (skill.cd < 5 ? ' хода' : ' ходов')));
+  }
+
+  function hideSkillTooltip() {
+    document.getElementById('skill-tooltip-overlay').classList.remove('show');
+  }
+
+  // долгое нажатие — показать описание, короткое — применить скилл
+  function attachSkillInteractions(box, skill) {
+    box.classList.add('interactive');
+    box.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    var pressTimer = null;
+    var longPressed = false;
+    function startPress(e) {
+      e.preventDefault();
+      longPressed = false;
+      pressTimer = setTimeout(function () {
+        longPressed = true;
+        showSkillTooltip(skill);
+      }, 450);
+    }
+    function endPress() {
+      clearTimeout(pressTimer);
+      var wasLong = longPressed;
+      hideSkillTooltip();
+      if (!wasLong) useSkill(skill);
+    }
+    function cancelPress() {
+      clearTimeout(pressTimer);
+      hideSkillTooltip();
+    }
+    box.addEventListener('pointerdown', startPress);
+    box.addEventListener('pointerup', endPress);
+    box.addEventListener('pointerleave', cancelPress);
+    box.addEventListener('pointercancel', cancelPress);
+  }
+
+  // для скиллов волка: долгое нажатие показывает описание, короткое ничего не делает — это скиллы противника
+  function attachEnemySkillTooltip(box, skill) {
+    box.classList.add('interactive');
+    box.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    var pressTimer = null;
+    function startPress(e) {
+      e.preventDefault();
+      pressTimer = setTimeout(function () { showSkillTooltip(skill); }, 450);
+    }
+    function endPress() {
+      clearTimeout(pressTimer);
+      hideSkillTooltip();
+    }
+    box.addEventListener('pointerdown', startPress);
+    box.addEventListener('pointerup', endPress);
+    box.addEventListener('pointerleave', endPress);
+    box.addEventListener('pointercancel', endPress);
+  }
+
+  // ===== ЗНАЧКИ ДЕБАФФОВ ПОД ПОРТРЕТАМИ =====
+  var statusDefs = {
+    bleed: {
+      cls: 'bleed',
+      name: 'Кровотечение',
+      desc: 'В начале хода теряет здоровье, пока эффект не закончится.',
+      icon: '<svg viewBox="0 0 24 24"><path d="M12 2.5C12 2.5 5.5 11.5 5.5 16C5.5 19.6 8.4 22.5 12 22.5C15.6 22.5 18.5 19.6 18.5 16C18.5 11.5 12 2.5 12 2.5Z" fill="#e35b4f"/></svg>'
+    },
+    shieldBreak: {
+      cls: 'shieldBreak',
+      name: 'Щит отключён',
+      desc: 'Броня отключена и не поглощает урон, но остаётся в запасе и вернётся, когда эффект закончится.',
+      icon: '<svg viewBox="0 0 24 24" fill="none"><path d="M12 2L4 5V11C4 16.5 7.4 20.7 12 22C16.6 20.7 20 16.5 20 11V5L12 2Z" stroke="#a99bd6" stroke-width="1.6"/><path d="M9 8L13 12L10 14L15 19" stroke="#ff6b57" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    },
+    stun: {
+      cls: 'stun',
+      name: 'Оглушение',
+      desc: 'Пропускает ход и не может использовать способности.',
+      icon: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#e0b95a" stroke-width="1.4" stroke-dasharray="3 3"/><path d="M8 9L10 11L8 13M16 9L14 11L16 13" stroke="#e0b95a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    },
+    vamp: {
+      cls: 'vamp',
+      name: 'Жажда крови',
+      desc: 'Восстанавливает здоровье в размере 50% от урона, наносимого атаками, пока эффект не закончится.',
+      icon: '<svg viewBox="0 0 24 24"><path d="M12 2.5C12 2.5 5.5 11.5 5.5 16C5.5 19.6 8.4 22.5 12 22.5C15.6 22.5 18.5 19.6 18.5 16C18.5 11.5 12 2.5 12 2.5Z" fill="#b0102c"/></svg>'
+    },
+    poison: {
+      cls: 'poison',
+      name: 'Отравление',
+      desc: 'В начале хода теряет здоровье от яда, пока эффект не закончится.',
+      icon: '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="#5fbf5f" stroke-width="1.6"/><path d="M12 7V13" stroke="#5fbf5f" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.1" fill="#5fbf5f"/></svg>'
+    },
+    berserk: {
+      cls: 'berserk',
+      name: 'Берсерк',
+      desc: 'Урон атак увеличен: в 1,5 раза при здоровье ниже 40%, в 2 раза при здоровье ниже 20%.',
+      icon: '<svg viewBox="0 0 24 24" fill="none"><path d="M4 20L10 6L13 13L16 6L20 20" stroke="#e05b3a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    },
+    transform: {
+      cls: 'transform',
+      name: 'Превращение',
+      desc: 'Обращён в безобидное животное: броня отключена, урон атак снижен.',
+      icon: '<svg viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="14" rx="7" ry="6" stroke="#a99bd6" stroke-width="1.6"/><path d="M7 9L6 5M17 9L18 5" stroke="#a99bd6" stroke-width="1.6" stroke-linecap="round"/></svg>'
+    }
+  };
+
+  // тап — показать описание, отпустить — скрыть (у дебаффов нет действия, поэтому без задержки)
+  function attachStatusTooltip(box, def, turns) {
+    box.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    function show(e) {
+      e.preventDefault();
+      var word = turns === 1 ? ' ход' : (turns < 5 ? ' хода' : ' ходов');
+      showInfoTooltip(def.name, def.desc, 'Осталось: ' + turns + word);
+    }
+    box.addEventListener('pointerdown', show);
+    box.addEventListener('pointerup', hideSkillTooltip);
+    box.addEventListener('pointerleave', hideSkillTooltip);
+    box.addEventListener('pointercancel', hideSkillTooltip);
+  }
+
+  function renderStatusRow(rowId, list) {
+    var row = document.getElementById(rowId);
+    if (!row) return;
+    row.innerHTML = '';
+    list.forEach(function (item) {
+      var def = statusDefs[item.key];
+      var box = document.createElement('div');
+      box.className = 'status-badge ' + def.cls;
+      box.innerHTML = def.icon + '<span class="status-count">' + item.turns + '</span>';
+      attachStatusTooltip(box, def, item.turns);
+      row.appendChild(box);
+    });
+  }
+
+  function renderPlayerStatuses() {
+    var list = [];
+    if (playerState.bleedTurns > 0) list.push({ key: 'bleed', turns: playerState.bleedTurns });
+    if (playerState.shieldDisabledTurns > 0) list.push({ key: 'shieldBreak', turns: playerState.shieldDisabledTurns });
+    if (playerState.berserkTurns > 0) list.push({ key: 'berserk', turns: playerState.berserkTurns });
+    renderStatusRow('player-status-row', list);
+  }
+
+  function renderEnemyStatuses() {
+    var list = [];
+    if (wolfState.bleedTurns > 0) list.push({ key: 'bleed', turns: wolfState.bleedTurns });
+    if (wolfState.armorDisabledTurns > 0) list.push({ key: 'shieldBreak', turns: wolfState.armorDisabledTurns });
+    if (wolfState.stunTurns > 0) list.push({ key: 'stun', turns: wolfState.stunTurns });
+    if (wolfState.vampTurns > 0) list.push({ key: 'vamp', turns: wolfState.vampTurns });
+    if (wolfState.poisonTurns > 0) list.push({ key: 'poison', turns: wolfState.poisonTurns });
+    if (wolfState.transformTurns > 0) list.push({ key: 'transform', turns: wolfState.transformTurns });
+    renderStatusRow('enemy-status-row', list);
+  }
+
+  // ===== АНИМАЦИИ И ЭФФЕКТЫ БОЯ =====
+  // удар мечом — дуга взмаха клинка (SVG-обводка, без внешних картинок)
+  function spawnSlashFx(slotId) {
+    spawnFxDiv(slotId, 'fx-slash', 500, '<svg viewBox="0 0 100 100"><path d="M14,84 Q50,6 90,46"/></svg>');
+  }
+
+  // укус — два ряда клыков смыкаются (CSS-треугольники, без внешних картинок)
+  function spawnBiteFx(slotId) {
+    var positions = [6, 22, 38, 54, 70];
+    var teeth = '';
+    positions.forEach(function (p) { teeth += '<span class="tooth top" style="left:' + p + '%"></span>'; });
+    positions.forEach(function (p) { teeth += '<span class="tooth bottom" style="left:' + p + '%"></span>'; });
+    spawnFxDiv(slotId, 'fx-bite-marks', 600, teeth);
+  }
+
+  // щит разбит — форма щита раскалывается на две половины (CSS, без внешних картинок)
+  function spawnShieldBreakFx(slotId) {
+    spawnFxDiv(slotId, 'fx-shield-break', 750, '<span class="crack"></span><span class="half left"></span><span class="half right"></span>');
+  }
+
+  function spawnShieldFx(cls) {
+    var slot = document.getElementById('player-fx-slot');
+    if (!slot) return;
+    var div = document.createElement('div');
+    div.className = 'fx-shield-raise' + (cls ? ' ' + cls : '');
+    slot.appendChild(div);
+    setTimeout(function () { if (div.parentNode) div.remove(); }, 800);
+  }
+
+  function spawnClawFx() {
+    var slot = document.getElementById('player-fx-slot');
+    if (!slot) return;
+    var div = document.createElement('div');
+    div.className = 'fx-claw-marks';
+    div.innerHTML = '<span></span><span></span><span></span><span></span>';
+    slot.appendChild(div);
+    setTimeout(function () { if (div.parentNode) div.remove(); }, 700);
+  }
+
+  // общий помощник: кладёт div с заданным классом в fx-slot и убирает его через duration мс
+  function spawnFxDiv(slotId, cls, duration, innerHTML) {
+    var slot = document.getElementById(slotId);
+    if (!slot) return;
+    var div = document.createElement('div');
+    div.className = cls;
+    if (innerHTML) div.innerHTML = innerHTML;
+    slot.appendChild(div);
+    setTimeout(function () { if (div.parentNode) div.remove(); }, duration || 700);
+  }
+
+  // выстрел лучника — стрела летит от игрока к волку
+  function spawnArrowFx() {
+    spawnFxDiv('enemy-fx-slot', 'fx-arrow', 450);
+  }
+
+  // уворот — кольцо на игроке в момент активации
+  function spawnEvadeRingFx() {
+    spawnFxDiv('player-fx-slot', 'fx-evade-ring', 650);
+  }
+
+  // самоисцеление — зелёное свечение и всплывающий текст с числом
+  function spawnHealFx(amount) {
+    spawnFxDiv('player-fx-slot', 'fx-heal-glow', 950);
+    spawnFxDiv('player-fx-slot', 'fx-heal-text', 1050, '+' + amount);
+  }
+
+  // жажда крови (зомби) — тёмно-красное свечение на противнике при активации бафа вампиризма
+  function spawnBloodlustFx() {
+    spawnFxDiv('enemy-fx-slot', 'fx-heal-glow', 950);
+  }
+
+  // вампиризм от нанесённого урона — всплывающий текст восстановления ХП на противнике
+  function spawnVampHealFx(amount) {
+    spawnFxDiv('enemy-fx-slot', 'fx-heal-text', 1050, '+' + amount);
+  }
+
+  // огненный шар волка встречает удар
+  function spawnFireFx() {
+    spawnFxDiv('enemy-fx-slot', 'fx-fireball', 700);
+  }
+
+  // цепь молний — зигзаг молнии на цели
+  var lightningSvg = '<svg viewBox="0 0 40 200" preserveAspectRatio="none"><polyline points="28,0 8,80 22,86 4,200 34,96 18,90 36,10" fill="none" stroke="#bfe8ff" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  function spawnChainFx() {
+    spawnFxDiv('enemy-fx-slot', 'fx-lightning', 550, lightningSvg);
+  }
+
+  // урон-отдача от магического щита — вспышка на волке
+  function spawnReflectFx() {
+    spawnFxDiv('enemy-fx-slot', 'fx-reflect-burst', 550);
+  }
+
+  function playAvatarAnim(el, cls, duration) {
+    if (!el) return;
+    el.classList.remove(cls);
+    void el.offsetWidth;
+    el.classList.add(cls);
+    setTimeout(function () { el.classList.remove(cls); }, duration || 550);
+  }
+
+  function playerAttackAnim() {
+    playAvatarAnim(document.getElementById('player-avatar'), 'attack-lunge');
+  }
+  function enemyHitAnim(crit) {
+    var wrap = document.getElementById('enemy-avatar-wrap');
+    if (!wrap) return;
+    var el = wrap.querySelector('.avatar-circle.enemy');
+    playAvatarAnim(el, 'enemy-hit');
+    if (crit) playAvatarAnim(el, 'crit-hit');
+  }
+  function wolfAttackAnim() {
+    var wrap = document.getElementById('enemy-avatar-wrap');
+    if (wrap) playAvatarAnim(wrap.querySelector('.avatar-circle.enemy'), 'wolf-lunge');
+  }
+  function playerHitAnim() {
+    playAvatarAnim(document.getElementById('player-avatar'), 'player-hit');
+  }
+  function playerDashEvadeAnim() {
+    playAvatarAnim(document.getElementById('player-avatar'), 'dash-evade');
+  }
+
+  function useSkill(skill) {
+    if (battleBusy || !wolfState.alive || !playerState.alive) return;
+    if (skill.remainingCd > 0) return;
+    battleBusy = true;
+
+    var heroLabel = chosenHero ? chosenHero.name : 'Герой';
+    var parts = [];
+
+    if (skill.dmgMin != null) {
+      var dmg = randInt(skill.dmgMin, skill.dmgMax) + getSkillDmgBonus();
+      var isCrit = !!(skill.critChance && Math.random() < luckBoost(skill.critChance));
+      if (isCrit) dmg = Math.round(dmg * (skill.critMult || 2));
+      var berserkMult = getBerserkMultiplier();
+      if (berserkMult > 1) dmg = Math.round(dmg * berserkMult);
+      var dealt = damageWolf(dmg);
+      parts.push(heroLabel + ' использует «' + skill.name + '»: противник получает <span class="dmg">' + dealt + ' урона</span>' + (isCrit ? ' — <span class="stun">критический удар!</span>' : '') + (berserkMult > 1 ? ' — <span class="berserk">Берсерк ×' + berserkMult + '!</span>' : '') + '.');
+
+      if (wolfState.alive && skill.bleedChance && Math.random() < luckBoost(skill.bleedChance)) {
+        wolfState.bleedTurns = skill.bleedTurns;
+        parts.push('<span class="bleed">Кровотечение: ' + skill.bleedTurns + ' хода.</span>');
+      }
+      if (wolfState.alive && skill.poisonChance && Math.random() < luckBoost(skill.poisonChance)) {
+        wolfState.poisonTurns = skill.poisonTurns;
+        wolfState.poisonDmg = skill.poisonDmg;
+        parts.push('<span class="poison">Отравление: ' + skill.poisonTurns + ' хода.</span>');
+      }
+      if (wolfState.alive && skill.stunChance && Math.random() < luckBoost(skill.stunChance)) {
+        wolfState.stunTurns = skill.stunTurns;
+        parts.push('<span class="stun">Противник оглушён на ' + skill.stunTurns + ' ход.</span>');
+      }
+      if (wolfState.alive && skill.disableArmorChance && Math.random() < luckBoost(skill.disableArmorChance)) {
+        wolfState.armor = 0;
+        wolfState.armorDisabledTurns = skill.disableArmorTurns;
+        parts.push('<span class="stun">Броня противника отключена на ' + skill.disableArmorTurns + ' хода.</span>');
+      }
+
+      var didChain = false;
+      if (wolfState.alive && skill.chainChance && Math.random() < luckBoost(skill.chainChance)) {
+        didChain = true;
+        var chainDmg = randInt(skill.chainDmgMin, skill.chainDmgMax) + getSkillDmgBonus();
+        var chainDealt = damageWolf(chainDmg);
+        parts.push('Молния бьёт снова: противник получает ещё <span class="dmg">' + chainDealt + ' урона</span>.');
+      }
+
+      // анимация атаки: игрок подаётся вперёд, летит эффект скилла, волк откатывается и краснеет
+      playerAttackAnim();
+      setTimeout(function () {
+        if (skill.fx === 'slash') spawnSlashFx('enemy-fx-slot');
+        else if (skill.fx === 'shot') spawnArrowFx();
+        else if (skill.fx === 'fire') spawnFireFx();
+        else if (skill.fx === 'chain') spawnChainFx();
+        else if (skill.fx === 'poison') spawnSlashFx('enemy-fx-slot');
+        enemyHitAnim(isCrit);
+        if (didChain) {
+          setTimeout(function () { spawnChainFx(); enemyHitAnim(false); }, 260);
+        }
+      }, 140);
+
+    } else if (skill.armor) {
+      var armorGain = skill.armor + getDefenseSkillArmorBonus();
+      playerState.armor = Math.min(playerState.maxArmor, playerState.armor + armorGain);
+      if (skill.reflectPct) playerState.magicShieldReflectPct = skill.reflectPct;
+      renderPlayerBars();
+      parts.push(heroLabel + ' использует «' + skill.name + '» и получает <span class="bleed">+' + armorGain + ' брони</span>.');
+      spawnShieldFx(skill.fx === 'magicShield' ? 'magic' : '');
+
+    } else if (skill.dodgeChance) {
+      playerState.dodgeChance = skill.dodgeChance;
+      playerState.dodgeTurns = skill.dodgeTurns;
+      parts.push(heroLabel + ' использует «' + skill.name + '»: ' + Math.round(luckBoost(skill.dodgeChance) * 100) + '% шанс увернуться от атаки в течение ' + skill.dodgeTurns + ' ходов.');
+      playerDashEvadeAnim();
+      spawnEvadeRingFx();
+
+    } else if (skill.healPct) {
+      var healAmt = Math.round(playerState.maxHp * skill.healPct) + getStrengthHealBonus();
+      playerState.hp = Math.min(playerState.maxHp, playerState.hp + healAmt);
+      renderPlayerBars();
+      parts.push(heroLabel + ' использует «' + skill.name + '» и восстанавливает <span class="bleed">' + healAmt + ' HP</span>.');
+      spawnHealFx(healAmt);
+
+    } else if (skill.transformTurns) {
+      wolfState.armor = 0;
+      wolfState.armorDisabledTurns = skill.disableArmorTurns;
+      wolfState.transformTurns = skill.transformTurns;
+      renderWolfBars();
+      parts.push(heroLabel + ' использует «' + skill.name + '»: противник обращён в безобидное животное на ' + skill.transformTurns + ' хода — его броня отключена, а урон атак снижен до ' + skill.transformAtk + ' единиц.');
+      playerAttackAnim();
+      setTimeout(function () { spawnFireFx(); enemyHitAnim(false); }, 140);
+    }
+
+    skill.remainingCd = skill.cd;
+    renderSkillBadges();
+    renderEnemyStatuses();
+    setDialogue(parts.join(' '));
+
+    if (!wolfState.alive) {
+      setTimeout(function () {
+        setDialogue(currentEnemyData.name + ' повержен.');
+        battleBusy = false;
+        showVictoryScreen();
+      }, 800);
+      return;
+    }
+
+    setTimeout(enemyTurn, 900);
+  }
+
+  function enemyTurn() {
+    var lines = [];
+    var heroLabel = chosenHero ? chosenHero.name : 'Герой';
+    var enemyLabel = currentEnemyData.name;
+
+    // кровотечение, наложенное игроком, тикает в начале хода противника
+    if (wolfState.bleedTurns > 0) {
+      var bleedDmg = damageWolf(wolfState.bleedDmg, true);
+      wolfState.bleedTurns--;
+      lines.push('Кровотечение: ' + enemyLabel + ' теряет <span class="dmg">' + bleedDmg + ' HP</span>.');
+      if (!wolfState.alive) {
+        lines.push(enemyLabel + ' истекает кровью и погибает.');
+        setDialogue(lines.join(' '));
+        renderEnemyStatuses();
+        renderPlayerStatuses();
+        battleBusy = false;
+        showVictoryScreen();
+        return;
+      }
+    }
+
+    // отравление, наложенное игроком, тикает в начале хода противника
+    if (wolfState.poisonTurns > 0) {
+      var poisonDmg = damageWolf(wolfState.poisonDmg, true);
+      wolfState.poisonTurns--;
+      lines.push('Отравление: ' + enemyLabel + ' теряет <span class="dmg">' + poisonDmg + ' HP</span>.');
+      if (!wolfState.alive) {
+        lines.push(enemyLabel + ' умирает от яда.');
+        setDialogue(lines.join(' '));
+        renderEnemyStatuses();
+        renderPlayerStatuses();
+        battleBusy = false;
+        showVictoryScreen();
+        return;
+      }
+    }
+
+    if (wolfState.stunTurns > 0) {
+      lines.push(enemyLabel + ' оглушён и не может действовать.');
+      setTimeout(function () {
+        wolfState.stunTurns--;
+        finishEnemyTurn(lines);
+      }, 900);
+      return;
+    }
+
+    var wolfSkill = pickWolfSkill();
+    if (!wolfSkill) {
+      lines.push(enemyLabel + ' рычит, но все его атаки ещё не готовы.');
+      finishEnemyTurn(lines);
+      return;
+    }
+
+    // «Жажда крови» и другие небоевые скиллы противника — баф на себя, без атаки в этот ход
+    if (wolfSkill.vampPct != null) {
+      wolfState.vampTurns = wolfSkill.vampTurns;
+      wolfState.vampPct = wolfSkill.vampPct;
+      wolfSkill.remainingCd = wolfSkill.cd;
+      lines.push(enemyLabel + ' использует «' + wolfSkill.name + '»: следующие ' + wolfSkill.vampTurns + ' хода его атаки будут восстанавливать <span class="vamp">' + Math.round(wolfSkill.vampPct * 100) + '% от нанесённого урона</span> в виде здоровья.');
+      wolfAttackAnim();
+      setTimeout(function () { spawnBloodlustFx(); }, 140);
+      finishEnemyTurn(lines);
+      return;
+    }
+
+    // уворот: шанс полностью избежать атаки противника
+    if (playerState.dodgeTurns > 0 && Math.random() < luckBoost(playerState.dodgeChance)) {
+      wolfSkill.remainingCd = wolfSkill.cd;
+      lines.push(enemyLabel + ' использует «' + wolfSkill.name + '», но ' + heroLabel + ' уворачивается — атака проходит мимо!');
+      wolfAttackAnim();
+      setTimeout(function () { playerDashEvadeAnim(); }, 140);
+      finishEnemyTurn(lines);
+      return;
+    }
+
+    var atkAmount = (wolfState.transformTurns > 0) ? 5 : randInt(wolfSkill.dmgMin, wolfSkill.dmgMax);
+    var dealt = damagePlayer(atkAmount);
+    lines.push(enemyLabel + ' использует «' + wolfSkill.name + '»: ' + heroLabel + ' получает <span class="dmg">' + dealt + ' урона</span>' + (wolfState.transformTurns > 0 ? ' <span class="berserk">(ослаблен превращением)</span>' : '') + '.');
+    checkBerserkTrigger(lines);
+    var reflectDmg = lastPlayerReflect;
+    if (reflectDmg > 0) {
+      lines.push('<span class="stun">Магический щит бьёт в ответ: ' + enemyLabel + ' получает ' + reflectDmg + ' урона.</span>');
+    }
+
+    // жажда крови: пока баф активен, атаки противника восстанавливают ему часть нанесённого урона
+    var vampHeal = 0;
+    if (wolfState.alive && wolfState.vampTurns > 0 && wolfState.vampPct > 0) {
+      vampHeal = Math.round(dealt * wolfState.vampPct);
+      if (vampHeal > 0) {
+        wolfState.hp = Math.min(wolfState.maxHp, wolfState.hp + vampHeal);
+        renderWolfBars();
+        lines.push('<span class="vamp">Жажда крови: ' + enemyLabel + ' восстанавливает ' + vampHeal + ' HP.</span>');
+      }
+    }
+
+    if (wolfSkill.bleedTurns) {
+      playerState.bleedTurns = wolfSkill.bleedTurns;
+      lines.push('<span class="bleed">Кровотечение: ' + heroLabel + ' теряет HP ещё ' + wolfSkill.bleedTurns + ' хода.</span>');
+    }
+    if (wolfSkill.disableShieldTurns) {
+      playerState.armorReserve = (playerState.armorReserve || 0) + playerState.armor;
+      playerState.armor = 0;
+      playerState.shieldDisabledTurns = wolfSkill.disableShieldTurns;
+      renderPlayerBars();
+      renderSkillBadges();
+      lines.push('<span class="stun">' + heroLabel + ': броня отключена на ' + wolfSkill.disableShieldTurns + ' хода — урон проходит насквозь, но броня в запасе и вернётся.</span>');
+    }
+    wolfSkill.remainingCd = wolfSkill.cd;
+
+    // анимация атаки противника: он подаётся вперёд, на игроке появляется эффект укуса/когтей, игрок откатывается и краснеет
+    wolfAttackAnim();
+    setTimeout(function () {
+      if (wolfSkill.fx === 'bite') {
+        spawnBiteFx('player-fx-slot');
+      } else if (wolfSkill.fx === 'claw') {
+        spawnClawFx();
+        setTimeout(function () {
+          spawnShieldBreakFx('player-fx-slot');
+        }, 260);
+      }
+      playerHitAnim();
+      if (vampHeal > 0) {
+        setTimeout(function () { spawnVampHealFx(vampHeal); }, 200);
+      }
+      if (reflectDmg > 0) {
+        setTimeout(function () {
+          spawnReflectFx();
+          enemyHitAnim(false);
+        }, 260);
+      }
+    }, 140);
+
+    if (!wolfState.alive) {
+      setTimeout(function () {
+        setDialogue(lines.join(' ') + ' ' + enemyLabel + ' повержен ответным ударом магического щита.');
+        battleBusy = false;
+        showVictoryScreen();
+      }, 500);
+      return;
+    }
+
+    if (!playerState.alive) {
+      setDialogue(lines.join(' ') + ' ' + heroLabel + ' повержен.');
+      battleBusy = false;
+      return;
+    }
+
+    finishEnemyTurn(lines);
+  }
+
+  // выбирает случайный скилл волка из тех, что не на КД
+  function pickWolfSkill() {
+    var available = currentEnemyData.skills.filter(function (s) { return s.remainingCd === 0; });
+    if (!available.length) return null;
+    return available[randInt(0, available.length - 1)];
+  }
+
+  // общая концовка хода волка: тик статусов игрока и волка, тик всех КД
+  function finishEnemyTurn(lines) {
+    var heroLabel = chosenHero ? chosenHero.name : 'Герой';
+    if (playerState.bleedTurns > 0) {
+      var pBleed = damagePlayer(playerState.bleedDmg, true);
+      playerState.bleedTurns--;
+      lines.push('Кровотечение: ' + heroLabel + ' теряет <span class="dmg">' + pBleed + ' HP</span>.');
+      if (!playerState.alive) {
+        lines.push(heroLabel + ' истекает кровью и погибает.');
+        setDialogue(lines.join(' '));
+        renderPlayerStatuses();
+        renderEnemyStatuses();
+        battleBusy = false;
+        return;
+      }
+    }
+    checkBerserkTrigger(lines);
+    if (playerState.berserkTurns > 0) {
+      playerState.berserkTurns--;
+      if (playerState.berserkTurns === 0) {
+        var bSkill = getKnightBerserkSkill();
+        playerState.berserkCd = (bSkill && bSkill.cd) || 6;
+      }
+    } else if (playerState.berserkCd > 0) {
+      playerState.berserkCd--;
+    }
+    if (wolfState.transformTurns > 0) {
+      wolfState.transformTurns--;
+    }
+    if (playerState.shieldDisabledTurns > 0) {
+      playerState.shieldDisabledTurns--;
+      if (playerState.shieldDisabledTurns === 0) {
+        playerState.armor = Math.min(playerState.maxArmor, playerState.armor + (playerState.armorReserve || 0));
+        playerState.armorReserve = 0;
+        renderPlayerBars();
+        lines.push(heroLabel + ': отключённая броня полностью возвращается.');
+      }
+    }
+    if (playerState.dodgeTurns > 0) {
+      playerState.dodgeTurns--;
+    }
+    if (wolfState.armorDisabledTurns > 0) {
+      wolfState.armorDisabledTurns--;
+    }
+    if (wolfState.vampTurns > 0) {
+      wolfState.vampTurns--;
+      if (wolfState.vampTurns === 0) wolfState.vampPct = 0;
+    }
+    setDialogue(lines.join(' '));
+    tickCooldowns();
+    tickWolfCooldowns();
+    renderSkillBadges();
+    renderPlayerStatuses();
+    renderEnemyStatuses();
+
+    // если у игрока сейчас нет ни одного доступного скилла — враг ходит снова,
+    // чтобы бой не вставал намертво в ожидании недоступного действия
+    if (playerState.alive && wolfState.alive && !playerHasUsableSkill()) {
+      setDialogue(lines.join(' ') + ' У героя нет доступных скиллов — враг атакует снова.');
+      setTimeout(enemyTurn, 900);
+      return;
+    }
+
+    battleBusy = false;
+  }
+
+  // строит HTML для одной иконки (картинка, если есть ассет, иначе эмодзи-плейсхолдер)
+  function iconMarkup(item) {
+    if (item.img) {
+      return '<img src="' + item.img + '.webp" onerror="this.onerror=null;this.src=\'' + item.img + '.png\';" alt="">';
+    }
+    return item.icon;
+  }
+
+  // ===== ЗАПОЛНЕНИЕ СЦЕНЫ БОЯ РЕАЛЬНЫМИ АССЕТАМИ ГЕРОЯ И ВРАГА =====
+
+  // ===== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ =====
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(function (s) {
+      s.classList.remove('active');
+    });
+    document.getElementById(id).classList.add('active');
+  }
+
+  document.getElementById('to-select-btn').addEventListener('click', function () {
+    showScreen('gender-screen');
+  });
+
+  // выбор героя временно отключён — героем всегда становится рыцарь
+  function chooseKnight() {
+    var c = characters[0]; // рыцарь
+    var isFemale = playerGender === 'female';
+    chosenHero = {
+      id: c.id,
+      name: isFemale && c.nameFemale ? c.nameFemale : c.name,
+      img: isFemale ? c.imgFemale : c.img,
+      imgFallback: isFemale ? c.imgFallbackFemale : c.imgFallback
+    };
+  }
+
+  document.getElementById('gender-male-btn').addEventListener('click', function () {
+    playerGender = 'male';
+    chooseKnight();
+    showScreen('location-screen');
+    renderHubHeader();
+    renderLocationEnemies();
+    renderDropList();
+  });
+  document.getElementById('gender-female-btn').addEventListener('click', function () {
+    playerGender = 'female';
+    chooseKnight();
+    showScreen('location-screen');
+    renderHubHeader();
+    renderLocationEnemies();
+    renderDropList();
+  });
+
+  function populateBattleDemo() {
+    var data = heroBattleData[chosenHero.id];
+
+    // определяем, с кем именно из списка локации завязался бой (волк или зомби),
+    // и подставляем его боевые данные как текущие
+    var locEnemy = (activeEnemyId != null) ? locationEnemies[activeEnemyId] : null;
+    currentEnemyData = (locEnemy && enemyTypesData[locEnemy.type]) ? enemyTypesData[locEnemy.type] : wolfBattleData;
+
+    // сброс состояния боя: ХП/уровень героя переносятся из профиля, противник каждый раз свежий
+    wolfState = { hp: currentEnemyData.hp, maxHp: currentEnemyData.hp, armor: 0, maxArmor: currentEnemyData.maxArmor, bleedTurns: 0, bleedDmg: 3, stunTurns: 0, armorDisabledTurns: 0, vampTurns: 0, vampPct: 0, poisonTurns: 0, poisonDmg: 0, transformTurns: 0, alive: true };
+    playerState = { hp: playerProfile.hp, maxHp: playerProfile.maxHp, armor: 0, maxArmor: 20 + getShieldArmorBonus(), armorReserve: getShieldArmorReserveBonus() + getDefenseArmorReserveBonus(), bleedTurns: 0, bleedDmg: 3, shieldDisabledTurns: 0, dodgeChance: 0, dodgeTurns: 0, magicShieldReflectPct: 0, berserkTurns: 0, berserkCd: 0, alive: playerProfile.hp > 0 };
+    battleBusy = false;
+    data.skills.forEach(function (s) { s.remainingCd = 0; });
+    currentEnemyData.skills.forEach(function (s) { s.remainingCd = 0; });
+
+    document.getElementById('player-name-label').textContent = chosenHero.name;
+    var playerAvatarEl = document.getElementById('player-avatar');
+    var playerAvatarImg = heroAvatarImg(chosenHero.id);
+    playerAvatarEl.innerHTML = playerAvatarImg ? iconMarkup({ img: playerAvatarImg }) : data.avatarIcon;
+    if (!playerAvatarEl.dataset.invBound) {
+      playerAvatarEl.addEventListener('click', openInventory);
+      playerAvatarEl.dataset.invBound = '1';
+    }
+
+    var row = document.getElementById('player-skill-row');
+    row.innerHTML = '';
+
+    getBattleSkills(data).forEach(function (s, i) {
+      var box = document.createElement('div');
+      box.className = 'skill-icon';
+      box.setAttribute('data-idx', i);
+      box.innerHTML = iconMarkup(s);
+      if (s.name) attachSkillInteractions(box, s);
+      row.appendChild(box);
+    });
+
+    // враг: имя дополняется уровнем, чтобы было видно, кто именно противостоит игроку
+    document.querySelector('#battle-demo-screen .battle-bars .unit-name').textContent = currentEnemyData.name + ' (Ур. ' + currentEnemyData.level + ')';
+    var enemyAvatarCol = document.getElementById('enemy-avatar-col');
+    var enemyAvatarInner = enemyAvatarCol.querySelector('.avatar-circle.enemy');
+    enemyAvatarInner.innerHTML = currentEnemyData.avatarImg ? iconMarkup({ img: currentEnemyData.avatarImg }) : currentEnemyData.avatarIcon;
+    if (!enemyAvatarInner.dataset.infoBound) {
+      enemyAvatarInner.addEventListener('click', openEnemyInfo);
+      enemyAvatarInner.dataset.infoBound = '1';
+    }
+
+    var enemyRow = document.getElementById('enemy-skill-row');
+    enemyRow.innerHTML = '';
+    currentEnemyData.skills.forEach(function (s, i) {
+      var box = document.createElement('div');
+      box.className = 'skill-icon';
+      box.setAttribute('data-enemy-idx', i);
+      box.innerHTML = iconMarkup(s);
+      if (s.name) attachEnemySkillTooltip(box, s);
+      enemyRow.appendChild(box);
+    });
+    enemyRow.appendChild(enemyAvatarCol);
+
+    renderWolfBars();
+    renderPlayerBars();
+    renderSkillBadges();
+    renderEnemySkillBadges();
+    renderPlayerStatuses();
+    renderEnemyStatuses();
+    setDialogue(currentEnemyData.name + ' напряжённо следит за тобой. Выбери скилл, чтобы начать бой.');
+    document.getElementById('victory-overlay').classList.remove('show');
+  }
+
+  // ===== ОКНО ИНФОРМАЦИИ О ПРОТИВНИКЕ =====
+  function openEnemyInfo() {
+    var loot = currentEnemyData.loot;
+    if (!loot) return;
+
+    document.getElementById('ei-name').textContent = currentEnemyData.name;
+
+    var portraitImg = document.getElementById('ei-portrait-img');
+    portraitImg.onerror = function () { this.onerror = null; this.src = currentEnemyData.avatarImg + '.png'; };
+    portraitImg.src = currentEnemyData.avatarImg + '.webp';
+    portraitImg.alt = currentEnemyData.name;
+
+    document.getElementById('ei-gold-row').style.display = 'none';
+
+    var dropsEl = document.getElementById('ei-drops');
+    dropsEl.innerHTML = '';
+    loot.drops.forEach(function (d) {
+      var row = document.createElement('div');
+      row.className = 'ei-row';
+      var img = document.createElement('img');
+      img.className = 'ei-icon';
+      img.alt = d.name;
+      img.onerror = function () { this.onerror = null; this.src = d.img + '.png'; };
+      img.src = d.img + '.webp';
+      var span = document.createElement('span');
+      span.innerHTML = d.name + ': <b>' + Math.round(luckBoost(d.chance) * 100) + '%</b>';
+      row.appendChild(img);
+      row.appendChild(span);
+      dropsEl.appendChild(row);
+    });
+
+    document.getElementById('ei-xp-text').innerHTML = 'Опыт за победу: <b>' + loot.xp + ' XP</b>';
+
+    document.getElementById('enemy-info-overlay').classList.add('show');
+  }
+
+  function closeEnemyInfo() {
+    document.getElementById('enemy-info-overlay').classList.remove('show');
+  }
+
+  document.getElementById('enemy-info-close').addEventListener('click', closeEnemyInfo);
+  document.getElementById('enemy-info-overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeEnemyInfo();
+  });
+
+  // ===== ОКНО ОКОНЧАНИЯ БОЯ (ПОБЕДА) =====
+  function showVictoryScreen() {
+    var loot = currentEnemyData.loot;
+    if (!loot) return;
+
+    document.getElementById('victory-xp-text').innerHTML = 'Опыт: <b>+' + loot.xp + ' XP</b>';
+
+    pendingVictoryGold = 0;
+    document.getElementById('victory-gold-row').style.display = 'none';
+
+    var wonDrops = loot.drops.filter(function (d) { return Math.random() < luckBoost(d.chance); });
+    pendingVictoryDrops = wonDrops;
+    var row = document.getElementById('victory-loot-row');
+    row.innerHTML = '';
+    if (!wonDrops.length) {
+      var empty = document.createElement('div');
+      empty.className = 'victory-empty';
+      empty.textContent = 'Предметов на этот раз не выпало.';
+      row.appendChild(empty);
+    } else {
+      wonDrops.forEach(function (d) {
+        var item = document.createElement('div');
+        item.className = 'victory-item';
+        var img = document.createElement('img');
+        img.className = 'victory-item-icon';
+        img.alt = d.name;
+        img.onerror = function () { this.onerror = null; this.src = d.img + '.png'; };
+        img.src = d.img + '.webp';
+        var span = document.createElement('span');
+        span.textContent = d.name;
+        item.appendChild(img);
+        item.appendChild(span);
+        row.appendChild(item);
+      });
+    }
+
+    document.getElementById('victory-overlay').classList.add('show');
+  }
+
+  // ===== ПРОФИЛЬ ИГРОКА: ОПЫТ И УРОВЕНЬ =====
+  function grantXp(amount) {
+    playerProfile.xp += amount;
+    while (playerProfile.xp >= playerProfile.xpToNext) {
+      playerProfile.xp -= playerProfile.xpToNext;
+      playerProfile.level++;
+      playerProfile.xpToNext = Math.round(playerProfile.xpToNext * 1.25);
+      playerProfile.maxHp += 10;
+      playerProfile.hp = playerProfile.maxHp;
+      statPoints += 3;
+    }
+  }
+
+  document.getElementById('victory-confirm-btn').addEventListener('click', function () {
+    document.getElementById('victory-overlay').classList.remove('show');
+
+    // сохраняем текущее ХП героя, начисляем опыт (с обработкой левел-апа) и золото
+    playerProfile.hp = playerState.hp;
+    grantXp(currentEnemyData.loot.xp);
+    playerGold += pendingVictoryGold;
+    pendingVictoryGold = 0;
+
+    // выпавшие предметы сначала попадают в список добычи на локации
+    pendingVictoryDrops.forEach(function (d) {
+      dropIdCounter++;
+      dropList.push({ uid: 'drop' + dropIdCounter, name: d.name, img: d.img, expiresAt: Date.now() + 90000 });
+    });
+    pendingVictoryDrops = [];
+
+    if (activeEnemyId != null && locationEnemies[activeEnemyId]) {
+      locationEnemies[activeEnemyId].alive = false;
+    }
+    activeEnemyId = null;
+
+    showLocationScreen();
+  });
+
+  // ===== ЭКРАН ЛОКАЦИИ =====
+  function showLocationScreen() {
+    document.getElementById('battle-demo-screen').classList.remove('active');
+    document.getElementById('location-screen').classList.add('active');
+    renderHubHeader();
+    renderLocationEnemies();
+    renderDropList();
+  }
+
+  function enterBattleWith(idx) {
+    activeEnemyId = idx;
+    document.getElementById('location-screen').classList.remove('active');
+    document.getElementById('battle-demo-screen').classList.add('active');
+    populateBattleDemo();
+  }
+
+  function renderHubHeader() {
+    document.getElementById('hub-level-value').textContent = playerProfile.level;
+    var hpPct = Math.round(playerProfile.hp / playerProfile.maxHp * 100);
+    document.getElementById('hub-hp-fill').style.width = hpPct + '%';
+    document.getElementById('hub-hp-value').textContent = playerProfile.hp + ' / ' + playerProfile.maxHp;
+    var xpPct = Math.round(playerProfile.xp / playerProfile.xpToNext * 100);
+    document.getElementById('hub-xp-fill').style.width = xpPct + '%';
+    document.getElementById('hub-xp-value').textContent = playerProfile.xp + ' / ' + playerProfile.xpToNext;
+
+    var avatarPath = heroAvatarImg(chosenHero.id);
+    var img = document.getElementById('hub-avatar-img');
+    if (avatarPath) {
+      img.onerror = function () { this.onerror = null; this.src = avatarPath + '.png'; };
+      img.src = avatarPath + '.webp';
+    }
+  }
+
+  function renderLocationEnemies() {
+    var list = document.getElementById('loc-enemy-list');
+    list.innerHTML = '';
+    var anyAlive = false;
+    locationEnemies.forEach(function (en, idx) {
+      if (!en.alive) return;
+      anyAlive = true;
+      var row = document.createElement('div');
+      row.className = 'loc-enemy-row';
+      var av = document.createElement('div');
+      av.className = 'loc-enemy-avatar';
+      var img = document.createElement('img');
+      img.alt = en.name;
+      img.onerror = function () { this.onerror = null; this.src = en.avatarImg + '.png'; };
+      img.src = en.avatarImg + '.webp';
+      av.appendChild(img);
+      var info = document.createElement('div');
+      info.className = 'loc-enemy-info';
+      info.innerHTML = '<div class="loc-enemy-name">' + en.name + '</div><div class="loc-enemy-level">Ур. ' + en.level + '</div>';
+      row.appendChild(av);
+      row.appendChild(info);
+      row.addEventListener('click', function () { enterBattleWith(idx); });
+      list.appendChild(row);
+    });
+    if (!anyAlive) {
+      var empty = document.createElement('div');
+      empty.className = 'loc-empty';
+      empty.textContent = 'На этой локации больше никого не осталось.';
+      list.appendChild(empty);
+    }
+  }
+
+  function formatTimer(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000));
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (r < 10 ? '0' : '') + r;
+  }
+
+  function renderDropList() {
+    var list = document.getElementById('loc-drop-list');
+    list.innerHTML = '';
+    if (!dropList.length) {
+      var empty = document.createElement('div');
+      empty.className = 'loc-empty';
+      empty.textContent = 'Пока ничего не найдено — победи врага, чтобы получить добычу.';
+      list.appendChild(empty);
+      return;
+    }
+    dropList.forEach(function (d) {
+      var row = document.createElement('div');
+      row.className = 'loc-drop-row';
+      var icon = document.createElement('div');
+      icon.className = 'loc-drop-icon';
+      var img = document.createElement('img');
+      img.alt = d.name;
+      img.onerror = function () { this.onerror = null; this.src = d.img + '.png'; };
+      img.src = d.img + '.webp';
+      icon.appendChild(img);
+      var name = document.createElement('div');
+      name.className = 'loc-drop-name';
+      name.textContent = d.name;
+      var timer = document.createElement('div');
+      timer.className = 'loc-drop-timer';
+      timer.textContent = formatTimer(d.expiresAt - Date.now());
+      row.appendChild(icon);
+      row.appendChild(name);
+      row.appendChild(timer);
+      row.addEventListener('click', function () { pickUpDrop(d.uid); });
+      list.appendChild(row);
+    });
+  }
+
+  // подбор предмета — переносит его в сумку героя и убирает из списка добычи локации
+  function pickUpDrop(uid) {
+    var drop = dropList.filter(function (d) { return d.uid === uid; })[0];
+    if (drop) addToBag(drop.name, drop.img);
+    dropList = dropList.filter(function (d) { return d.uid !== uid; });
+    renderDropList();
+  }
+
+  function addToBag(name, img) {
+    var existing = bagItems.filter(function (it) { return it.name === name; })[0];
+    if (existing) existing.count++;
+    else bagItems.push({ name: name, img: img, count: 1 });
+  }
+
+  // раз в секунду обновляем таймеры, убираем истёкшие предметы и проверяем, не пора ли заспавнить нового врага
+  setInterval(function () {
+    var now = Date.now();
+    if (now >= nextSpawnAt) {
+      spawnLocationEnemy();
+      nextSpawnAt = now + SPAWN_INTERVAL_MS;
+    }
+    if (!dropList.length) return;
+    var hadExpired = dropList.some(function (d) { return d.expiresAt <= now; });
+    dropList = dropList.filter(function (d) { return d.expiresAt > now; });
+    if (document.getElementById('location-screen').classList.contains('active')) {
+      if (hadExpired) {
+        renderDropList();
+      } else {
+        var timers = document.querySelectorAll('.loc-drop-timer');
+        var i = 0;
+        dropList.forEach(function (d) {
+          if (timers[i]) timers[i].textContent = formatTimer(d.expiresAt - now);
+          i++;
+        });
+      }
+    }
+  }, 1000);
+
+  // ===== БОКОВЫЕ ПАНЕЛИ =====
+  document.getElementById('burger-btn').addEventListener('click', function () {
+    document.getElementById('burger-overlay').classList.add('show');
+  });
+  document.getElementById('burger-overlay').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+
+  // ===== ПУНКТ МЕНЮ «ПОРТАЛ» =====
+  document.getElementById('menu-portal-btn').addEventListener('click', function () {
+    this.classList.toggle('open');
+    document.getElementById('menu-portal-list').classList.toggle('open');
+  });
+  document.getElementById('menu-portal-lolita').addEventListener('click', function () {
+    document.getElementById('burger-overlay').classList.remove('show');
+    openShop();
+  });
+  document.getElementById('hub-avatar-btn').addEventListener('click', openInventory);
+  document.getElementById('inv-close-btn').addEventListener('click', closeInventory);
+  document.getElementById('inventory-overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeInventory();
+  });
+
+  // ===== ИНВЕНТАРЬ =====
+  function openInventory() {
+    renderInventory();
+    document.getElementById('inventory-overlay').classList.add('show');
+  }
+
+  function closeInventory() {
+    document.getElementById('inventory-overlay').classList.remove('show');
+  }
+
+  function renderInventory() {
+    if (!chosenHero) return;
+
+    document.getElementById('inv-nickname').textContent = chosenHero.name;
+    document.getElementById('inv-level-value').textContent = playerProfile.level;
+    var xpPct = Math.round(playerProfile.xp / playerProfile.xpToNext * 100);
+    document.getElementById('inv-xp-fill').style.width = xpPct + '%';
+    document.getElementById('inv-xp-value').textContent = playerProfile.xp + ' / ' + playerProfile.xpToNext;
+
+    var img = document.getElementById('inv-portrait-img');
+    img.onerror = function () { this.onerror = null; this.src = chosenHero.imgFallback; };
+    img.src = chosenHero.img;
+
+    var goldIcon = document.getElementById('inv-gold-icon');
+    var goldSrc = currentEnemyData.loot.goldIcon;
+    goldIcon.onerror = function () { this.onerror = null; this.src = goldSrc + '.png'; };
+    goldIcon.src = goldSrc + '.webp';
+    document.getElementById('inv-gold-value').textContent = playerGold;
+
+    renderEquipSlots();
+    renderBagTab();
+    renderSkillsTab();
+    renderStatsTab();
+  }
+
+  function renderBagTab() {
+    var pane = document.getElementById('inv-pane-bag');
+    pane.innerHTML = '';
+    if (!bagItems.length) {
+      var empty = document.createElement('div');
+      empty.className = 'inv-hint';
+      empty.textContent = 'Сумка пуста. Подбирай добычу на локации после боя.';
+      pane.appendChild(empty);
+      return;
+    }
+    bagItems.forEach(function (it) {
+      var row = document.createElement('div');
+      row.className = 'inv-item-row';
+      var icon = document.createElement('div');
+      icon.className = 'inv-item-icon';
+      var iimg = document.createElement('img');
+      iimg.alt = it.name;
+      iimg.onerror = function () { this.onerror = null; this.src = it.img + '.png'; };
+      iimg.src = it.img + '.webp';
+      icon.appendChild(iimg);
+      var body = document.createElement('div');
+      body.className = 'inv-item-body';
+      body.innerHTML = '<div class="inv-item-name">' + it.name + '</div>';
+      var count = document.createElement('div');
+      count.className = 'inv-item-count';
+      count.textContent = 'x' + it.count;
+      row.appendChild(icon);
+      row.appendChild(body);
+      row.appendChild(count);
+
+      var def = ITEM_DEFS[it.name];
+      if (def && def.type === 'equip') {
+        var equipBtn = document.createElement('button');
+        equipBtn.className = 'inv-item-action-btn';
+        equipBtn.textContent = 'Экипировать';
+        equipBtn.addEventListener('click', function () { equipItem(it.name); });
+        row.appendChild(equipBtn);
+      } else if (def && def.type === 'potion') {
+        var useBtn = document.createElement('button');
+        useBtn.className = 'inv-item-action-btn';
+        useBtn.textContent = 'Использовать';
+        useBtn.addEventListener('click', function () { usePotion(it.name); });
+        row.appendChild(useBtn);
+      }
+
+      pane.appendChild(row);
+    });
+  }
+
+  // ===== ЭКИПИРОВКА: СЛОТЫ ОРУЖИЯ И ЩИТА =====
+  function renderEquipSlots() {
+    renderEquipSlot('weapon', 'Оружие');
+    renderEquipSlot('shield', 'Щит');
+  }
+
+  function renderEquipSlot(slot, emptyLabel) {
+    var el = document.getElementById('equip-slot-' + slot);
+    if (!el) return;
+    var eq = playerEquip[slot];
+    el.innerHTML = '';
+    if (eq) {
+      el.classList.add('filled');
+      var img = document.createElement('img');
+      img.alt = eq.name;
+      img.onerror = function () { this.onerror = null; this.src = eq.img + '.png'; };
+      img.src = eq.img + '.webp';
+      el.appendChild(img);
+    } else {
+      el.classList.remove('filled');
+      el.textContent = emptyLabel;
+    }
+  }
+
+  // экипировать оружие/щит из сумки — если слот уже занят, прежний предмет возвращается в сумку
+  function equipItem(name) {
+    var def = ITEM_DEFS[name];
+    if (!def || def.type !== 'equip') return;
+    var it = bagItems.filter(function (i) { return i.name === name; })[0];
+    if (!it) return;
+
+    var prev = playerEquip[def.slot];
+    if (prev) addToBag(prev.name, prev.img);
+
+    playerEquip[def.slot] = { name: name, img: it.img, dmgBonus: def.dmgBonus, armorBonus: def.armorBonus, armorReserveBonus: def.armorReserveBonus };
+
+    it.count--;
+    if (it.count <= 0) bagItems = bagItems.filter(function (i) { return i.name !== name; });
+
+    renderInventory();
+  }
+
+  // снять экипированный предмет — возвращается в сумку
+  function unequipItem(slot) {
+    var eq = playerEquip[slot];
+    if (!eq) return;
+    addToBag(eq.name, eq.img);
+    playerEquip[slot] = null;
+    renderInventory();
+  }
+
+  ['weapon', 'shield'].forEach(function (slot) {
+    document.getElementById('equip-slot-' + slot).addEventListener('click', function () {
+      unequipItem(slot);
+    });
+  });
+
+  // использовать зелье из сумки — работает и в бою (тратит ход игрока), и на локации (лечит мгновенно)
+  function usePotion(name) {
+    var def = ITEM_DEFS[name];
+    if (!def || def.type !== 'potion') return;
+    var it = bagItems.filter(function (i) { return i.name === name; })[0];
+    if (!it) return;
+
+    var inBattle = document.getElementById('battle-demo-screen').classList.contains('active');
+
+    if (inBattle) {
+      if (battleBusy || !playerState.alive || !wolfState.alive) return;
+      battleBusy = true;
+      var healAmt = Math.min(def.heal, playerState.maxHp - playerState.hp);
+      playerState.hp = Math.min(playerState.maxHp, playerState.hp + healAmt);
+      renderPlayerBars();
+      spawnHealFx(healAmt);
+      consumeBagItem(name);
+      closeInventory();
+      var heroLabel = chosenHero ? chosenHero.name : 'Герой';
+      setDialogue(heroLabel + ' использует «' + name + '» и восстанавливает <span class="bleed">' + healAmt + ' HP</span>.');
+      setTimeout(enemyTurn, 900);
+    } else {
+      var healAmtOut = Math.min(def.heal, playerProfile.maxHp - playerProfile.hp);
+      playerProfile.hp = Math.min(playerProfile.maxHp, playerProfile.hp + healAmtOut);
+      consumeBagItem(name);
+      renderHubHeader();
+      renderInventory();
+    }
+  }
+
+  function consumeBagItem(name) {
+    var it = bagItems.filter(function (i) { return i.name === name; })[0];
+    if (!it) return;
+    it.count--;
+    if (it.count <= 0) bagItems = bagItems.filter(function (i) { return i.name !== name; });
+  }
+
+  function renderSkillsTab() {
+    var pane = document.getElementById('inv-pane-skills');
+    pane.innerHTML = '';
+    var data = heroBattleData[chosenHero.id];
+    data.skills.filter(isSkillUnlocked).forEach(function (s) {
+      var row = document.createElement('div');
+      row.className = 'inv-item-row';
+      var icon = document.createElement('div');
+      icon.className = 'inv-item-icon';
+      icon.innerHTML = iconMarkup(s);
+      var body = document.createElement('div');
+      body.className = 'inv-item-body';
+      var nameLine = s.name + (s.passive ? ' <i>(пассивный)</i>' : '');
+      body.innerHTML = '<div class="inv-item-name">' + nameLine + '</div><div class="inv-item-desc">' + getSkillDesc(s) + '</div>';
+      row.appendChild(icon);
+      row.appendChild(body);
+      pane.appendChild(row);
+    });
+    var hint = document.createElement('div');
+    hint.className = 'inv-hint';
+    hint.textContent = 'Новые способности будут открываться с ростом уровня.';
+    pane.appendChild(hint);
+  }
+
+  // ===== ОПИСАНИЯ СТАТОВ (для долгого нажатия в меню прокачки) =====
+  var STAT_DESCS = {
+    attack: function () {
+      return 'Каждое очко: +2 к урону всех атакующих скиллов героя (любой класс). Сейчас: +' + getAttackDmgBonus() + ' к урону.';
+    },
+    health: function () {
+      return 'Каждое очко: +3 к максимальному и текущему здоровью. Сейчас: +' + (statPointsInvested('health') * 3) + ' HP.';
+    },
+    defense: function () {
+      return 'Каждое очко: +3 к запасу брони в начале боя и +2 к броне от скиллов-щитов (например, «Поднять щит»). Сейчас: +' + getDefenseArmorReserveBonus() + ' к запасу, +' + getDefenseSkillArmorBonus() + ' к броне от щитов.';
+    },
+    luck: function () {
+      return 'Каждое очко: +1% ко всем шансам скиллов (крит, кровотечение, оглушение и т.д.) и к шансу выпадения добычи. Сейчас: +' + Math.round(getLuckPct() * 100) + '%.';
+    },
+    strength: function () {
+      return 'Каждое очко: +2 к урону немагических скиллов и +2 к лечению от скилла самоисцеления (на зелья не влияет). Сейчас: +' + getStrengthDmgBonus() + ' к урону, +' + getStrengthHealBonus() + ' к лечению.';
+    },
+    agility: function () {
+      return 'Каждое очко: -1% к вероятностям способностей противника. Сейчас: -' + Math.round(getAgilityPct() * 100) + '%. Пока не действует — у врагов ещё нет способностей с шансом срабатывания.';
+    },
+    intellect: function () {
+      return 'Каждое очко: +2 к урону скиллов мага (на других героев не влияет). Сейчас: +' + getIntellectDmgBonus() + ' к урону.';
+    }
+  };
+  function getStatDesc(key) { return STAT_DESCS[key] ? STAT_DESCS[key]() : ''; }
+
+  // долгое нажатие на строку стата — показать его эффект (переиспользуем всплывающую карточку скиллов)
+  // используем и Pointer Events, и touch/mouse как запасной вариант — на некоторых мобильных браузерах
+  // Pointer Events работают ненадёжно, а повторный вызов startPress/endPress безопасен (идемпотентен)
+  function attachStatTooltip(el, key) {
+    el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+    var pressTimer = null;
+    function startPress(e) {
+      if (e.target.closest && e.target.closest('.inv-stat-plus')) return;
+      if (e.cancelable) e.preventDefault();
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(function () {
+        showInfoTooltip(statLabels[key], getStatDesc(key), '');
+      }, 400);
+    }
+    function endPress() {
+      clearTimeout(pressTimer);
+      hideSkillTooltip();
+    }
+    el.addEventListener('pointerdown', startPress);
+    el.addEventListener('pointerup', endPress);
+    el.addEventListener('pointerleave', endPress);
+    el.addEventListener('pointercancel', endPress);
+    el.addEventListener('touchstart', startPress, { passive: false });
+    el.addEventListener('touchend', endPress);
+    el.addEventListener('touchcancel', endPress);
+    el.addEventListener('mousedown', startPress);
+    el.addEventListener('mouseup', endPress);
+    el.addEventListener('mouseleave', endPress);
+  }
+
+  function renderStatsTab() {
+    var pane = document.getElementById('inv-pane-stats');
+    pane.innerHTML = '';
+    var pointsLine = document.createElement('div');
+    pointsLine.className = 'inv-stat-points';
+    pointsLine.textContent = statPoints > 0 ? 'Свободные очки: ' + statPoints : 'Свободных очков нет';
+    pane.appendChild(pointsLine);
+
+    Object.keys(playerStats).forEach(function (key) {
+      var row = document.createElement('div');
+      row.className = 'inv-stat-row';
+      attachStatTooltip(row, key);
+      var name = document.createElement('div');
+      name.className = 'inv-stat-name';
+      name.textContent = statLabels[key];
+      var right = document.createElement('div');
+      right.className = 'inv-stat-right';
+      var value = document.createElement('div');
+      value.className = 'inv-stat-value';
+      value.textContent = playerStats[key];
+      var plus = document.createElement('button');
+      plus.className = 'inv-stat-plus';
+      plus.textContent = '+';
+      plus.disabled = statPoints <= 0;
+      plus.addEventListener('click', function () {
+        if (statPoints <= 0) return;
+        playerStats[key]++;
+        statPoints--;
+        if (key === 'health') {
+          playerProfile.maxHp += 3;
+          playerProfile.hp += 3;
+          playerState.maxHp += 3;
+          playerState.hp += 3;
+          renderHubHeader();
+          renderPlayerBars();
+        }
+        renderStatsTab();
+      });
+      right.appendChild(value);
+      right.appendChild(plus);
+      row.appendChild(name);
+      row.appendChild(right);
+      pane.appendChild(row);
+    });
+  }
+
+  ['bag', 'skills', 'stats'].forEach(function (tab) {
+    document.getElementById('inv-tab-btn-' + tab).addEventListener('click', function () {
+      ['bag', 'skills', 'stats'].forEach(function (t) {
+        document.getElementById('inv-tab-btn-' + t).classList.toggle('active', t === tab);
+        document.getElementById('inv-pane-' + t).classList.toggle('active', t === tab);
+      });
+    });
+  });
+
+  // ===== МАГАЗИН СКУПЩИЦЫ ЛОЛИТЫ =====
+  // цены скупки за одну штуку — подбираются по подстроке в названии предмета,
+  // так что "Волчий хвост", "Кости"/"Гнилые кости", "Клык"/"Зомби-клык" попадают
+  // в нужную категорию независимо от того, с какого врага они выпали
+  var SELL_PRICES = [
+    { match: 'хвост', price: 3 },
+    { match: 'кост', price: 2 },
+    { match: 'клык', price: 15 }
+  ];
+
+  function getSellPrice(name) {
+    var lower = name.toLowerCase();
+    for (var i = 0; i < SELL_PRICES.length; i++) {
+      if (lower.indexOf(SELL_PRICES[i].match) !== -1) return SELL_PRICES[i].price;
+    }
+    return null; // предмет пока не скупается
+  }
+
+  var shopGreetings = [
+    'Оо, гость! Заходи, заходи — у Лолиты всегда найдётся, чем поживиться. Продашь мне свой хлам или, может, присмотришь что прикупить?',
+    'Смотрю, сумка снова полна всякой всячины? Неси сюда — заплачу честно, до последней монетки. А там, глядишь, и себе что-нибудь подберёшь.',
+    'Не стой в дверях, дорогуша! Кости, клыки, хвосты — всё приму, всё оценю по совести. Ну а если руки чешутся купить — тоже подскажу.'
+  ];
+
+  var shopQty = {}; // выбранное количество для продажи, по названию предмета
+
+  function openShop() {
+    document.getElementById('shop-dialog-text').textContent =
+      shopGreetings[Math.floor(Math.random() * shopGreetings.length)];
+
+    var portrait = document.getElementById('shop-npc-portrait');
+    portrait.onerror = function () { this.onerror = null; this.src = 'assets/npc-lolita-full.png'; };
+    portrait.src = 'assets/npc-lolita-full.webp';
+
+    var goldIcon = document.getElementById('shop-gold-icon');
+    goldIcon.onerror = function () { this.onerror = null; this.src = 'assets/loot-gold.png'; };
+    goldIcon.src = 'assets/loot-gold.webp';
+
+    renderShop();
+    document.getElementById('shop-overlay').classList.add('show');
+  }
+
+  function closeShop() {
+    document.getElementById('shop-overlay').classList.remove('show');
+  }
+
+  function renderShop() {
+    document.getElementById('shop-gold-value').textContent = playerGold;
+    renderShopSell();
+    renderShopBuy();
+  }
+
+  function renderShopSell() {
+    var pane = document.getElementById('shop-pane-sell');
+    pane.innerHTML = '';
+
+    var sellable = bagItems.filter(function (it) { return getSellPrice(it.name) !== null; });
+
+    if (!sellable.length) {
+      var empty = document.createElement('div');
+      empty.className = 'shop-hint';
+      empty.textContent = 'Продать пока нечего — принеси добычу с охоты, и Лолита с радостью её оценит.';
+      pane.appendChild(empty);
+      return;
+    }
+
+    sellable.forEach(function (it) {
+      var unitPrice = getSellPrice(it.name);
+      if (!(it.name in shopQty) || shopQty[it.name] > it.count) shopQty[it.name] = 1;
+      var qty = shopQty[it.name];
+
+      var row = document.createElement('div');
+      row.className = 'shop-item-row';
+
+      var icon = document.createElement('div');
+      icon.className = 'shop-item-icon';
+      var iimg = document.createElement('img');
+      iimg.alt = it.name;
+      iimg.onerror = function () { this.onerror = null; this.src = it.img + '.png'; };
+      iimg.src = it.img + '.webp';
+      icon.appendChild(iimg);
+
+      var body = document.createElement('div');
+      body.className = 'shop-item-body';
+      body.innerHTML = '<div class="shop-item-name">' + it.name + '</div>' +
+        '<div class="shop-item-have">У вас: x' + it.count + '</div>';
+
+      var qtyBox = document.createElement('div');
+      qtyBox.className = 'shop-item-qty';
+      var minus = document.createElement('button');
+      minus.className = 'shop-qty-btn';
+      minus.textContent = '−';
+      minus.addEventListener('click', function () {
+        if (shopQty[it.name] > 1) { shopQty[it.name]--; renderShopSell(); }
+      });
+      var qtyValue = document.createElement('div');
+      qtyValue.className = 'shop-qty-value';
+      qtyValue.textContent = qty;
+      var plus = document.createElement('button');
+      plus.className = 'shop-qty-btn';
+      plus.textContent = '+';
+      plus.addEventListener('click', function () {
+        if (shopQty[it.name] < it.count) { shopQty[it.name]++; renderShopSell(); }
+      });
+      qtyBox.appendChild(minus);
+      qtyBox.appendChild(qtyValue);
+      qtyBox.appendChild(plus);
+
+      var price = document.createElement('div');
+      price.className = 'shop-item-price';
+      price.textContent = (unitPrice * qty) + ' мон.';
+
+      var sellBtn = document.createElement('button');
+      sellBtn.className = 'shop-sell-btn';
+      sellBtn.textContent = 'Продать';
+      sellBtn.addEventListener('click', function () { sellShopItem(it.name); });
+
+      row.appendChild(icon);
+      row.appendChild(body);
+      row.appendChild(qtyBox);
+      row.appendChild(price);
+      row.appendChild(sellBtn);
+      pane.appendChild(row);
+    });
+  }
+
+  function sellShopItem(name) {
+    var it = bagItems.filter(function (i) { return i.name === name; })[0];
+    if (!it) return;
+    var qty = Math.min(shopQty[name] || 1, it.count);
+    var unitPrice = getSellPrice(name);
+    if (unitPrice === null) return;
+
+    playerGold += unitPrice * qty;
+    it.count -= qty;
+    if (it.count <= 0) {
+      bagItems = bagItems.filter(function (i) { return i.name !== name; });
+      delete shopQty[name];
+    } else {
+      shopQty[name] = 1;
+    }
+
+    document.getElementById('shop-gold-value').textContent = playerGold;
+    renderShopSell();
+  }
+
+  // товары на продажу у Лолиты — статичный ассортимент лавки
+  var shopBuyItems = [
+    { name: 'Большая банка целебного зелья', img: 'assets/potion-heal-big', price: 50, desc: 'Восстанавливает 75 HP' },
+    { name: 'Малая банка целебного зелья', img: 'assets/potion-heal-small', price: 12, desc: 'Восстанавливает 25 HP' },
+    { name: 'Кинжал', img: 'assets/item-dagger', price: 100, desc: '+5 к урону' },
+    { name: 'Щит', img: 'assets/item-shield', price: 75, desc: '+5 к запасу брони, +15 к броне' }
+  ];
+
+  function renderShopBuy() {
+    var pane = document.getElementById('shop-pane-buy');
+    pane.innerHTML = '';
+
+    shopBuyItems.forEach(function (it) {
+      var row = document.createElement('div');
+      row.className = 'shop-item-row';
+
+      var icon = document.createElement('div');
+      icon.className = 'shop-item-icon';
+      var iimg = document.createElement('img');
+      iimg.alt = it.name;
+      iimg.onerror = function () { this.onerror = null; this.src = it.img + '.png'; };
+      iimg.src = it.img + '.webp';
+      icon.appendChild(iimg);
+
+      var body = document.createElement('div');
+      body.className = 'shop-item-body';
+      body.innerHTML = '<div class="shop-item-name">' + it.name + '</div>' +
+        '<div class="shop-item-desc">' + it.desc + '</div>';
+
+      var price = document.createElement('div');
+      price.className = 'shop-item-price';
+      price.textContent = it.price + ' мон.';
+
+      var buyBtn = document.createElement('button');
+      buyBtn.className = 'shop-sell-btn' + (playerGold < it.price ? ' low-funds' : '');
+      buyBtn.textContent = 'Купить';
+      buyBtn.addEventListener('click', function () { buyShopItem(it.name, price); });
+
+      row.appendChild(icon);
+      row.appendChild(body);
+      row.appendChild(price);
+      row.appendChild(buyBtn);
+      pane.appendChild(row);
+    });
+  }
+
+  function buyShopItem(name, priceEl) {
+    var it = shopBuyItems.filter(function (i) { return i.name === name; })[0];
+    if (!it) return;
+
+    if (playerGold < it.price) {
+      if (priceEl) {
+        var original = priceEl.textContent;
+        priceEl.textContent = 'Мало золота!';
+        priceEl.classList.add('warn');
+        setTimeout(function () {
+          priceEl.textContent = original;
+          priceEl.classList.remove('warn');
+        }, 1000);
+      }
+      return;
+    }
+
+    playerGold -= it.price;
+    addToBag(it.name, it.img);
+
+    document.getElementById('shop-gold-value').textContent = playerGold;
+    renderShopBuy();
+  }
+
+  ['sell', 'buy'].forEach(function (tab) {
+    document.getElementById('shop-tab-btn-' + tab).addEventListener('click', function () {
+      ['sell', 'buy'].forEach(function (t) {
+        document.getElementById('shop-tab-btn-' + t).classList.toggle('active', t === tab);
+        document.getElementById('shop-pane-' + t).classList.toggle('active', t === tab);
+      });
+    });
+  });
+
+  document.getElementById('shop-close-btn').addEventListener('click', closeShop);
+  document.getElementById('shop-overlay').addEventListener('click', function (e) {
+    if (e.target === this) closeShop();
+  });
+
+</script>
+
+</body>
+</html>
